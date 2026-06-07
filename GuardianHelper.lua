@@ -1,547 +1,450 @@
 -- ============================================================
--- GuardianHelper v4.0 — WoW Classic Style UI
--- Guardian Druid Tank Addon — Level 1-70 (Classic & TBC)
--- Design: Dark leather/stone, gold borders, amber text
+-- GuardianHelper v4.1 — Stable Core
+-- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
+local VERSION = "4.1.0"
 
-local GH_VERSION = "4.0.0"
+-- SavedVariables werden nach ADDON_LOADED initialisiert
+local DB
 
 -- ============================================================
--- SPELL-GRUPPEN
+-- SPELL DATEN
 -- ============================================================
 local SPELL_GROUPS = {
-    MAUL           = { label="Bash",    shortLabel="Bash",   autoUpdate=true,  ranks={{id=6807,level=10},{id=8972,level=18},{id=9745,level=26},{id=9880,level=34},{id=9881,level=42},{id=26996,level=50},{id=26997,level=58},{id=48479,level=62},{id=48480,level=70}} },
-    SWIPE          = { label="Swipe",   shortLabel="Swipe",  autoUpdate=true,  ranks={{id=779,level=16},{id=780,level=24},{id=769,level=34},{id=9754,level=44},{id=9908,level=54},{id=48562,level=62}} },
-    BASH           = { label="Bash",    shortLabel="Bash",   autoUpdate=true,  ranks={{id=5211,level=14},{id=6798,level=22},{id=8983,level=32},{id=25515,level=42}} },
-    GROWL          = { label="Growl",   shortLabel="Growl",  autoUpdate=false, ranks={{id=6795,level=10}} },
-    ENRAGE         = { label="Enrage",  shortLabel="Enrg",   autoUpdate=false, ranks={{id=5229,level=14}} },
-    DEMO_ROAR      = { label="D.Roar",  shortLabel="D.Roar", autoUpdate=true,  ranks={{id=99,level=8},{id=1735,level=16},{id=9490,level=24},{id=9747,level=32},{id=9898,level=42},{id=26998,level=52}} },
-    FAERIE_FIRE    = { label="F.Fire",  shortLabel="F.Fire", autoUpdate=false, ranks={{id=16857,level=20},{id=17390,level=30},{id=17391,level=40},{id=17392,level=50},{id=27011,level=60}} },
-    FRENZIED_REGEN = { label="F.Reg",   shortLabel="F.Reg",  autoUpdate=false, ranks={{id=22842,level=36},{id=22895,level=46},{id=22896,level=56},{id=26999,level=66}} },
-    BARKSKIN       = { label="Bark",    shortLabel="Bark",   autoUpdate=false, ranks={{id=22812,level=44}} },
-    MANGLE_BEAR    = { label="Mangle",  shortLabel="Mngl",   autoUpdate=true,  ranks={{id=33878,level=60},{id=33986,level=66}} },
-    LACERATE       = { label="Lacer.",  shortLabel="Lac.",   autoUpdate=true,  ranks={{id=33745,level=66}} },
+    BASH           = { label="Bash",   ranks={{id=5211,lv=14},{id=6798,lv=22},{id=8983,lv=32},{id=25515,lv=42}} },
+    GROWL          = { label="Growl",  ranks={{id=6795,lv=10}} },
+    ENRAGE         = { label="Enrg",   ranks={{id=5229,lv=14}} },
+    FRENZIED_REGEN = { label="F.Reg",  ranks={{id=22842,lv=36},{id=22895,lv=46},{id=22896,lv=56},{id=26999,lv=66}} },
+    BARKSKIN       = { label="Bark",   ranks={{id=22812,lv=44}} },
+    MANGLE_BEAR    = { label="Mngl",   ranks={{id=33878,lv=60},{id=33986,lv=66}} },
+    LACERATE       = { label="Lac.",   ranks={{id=33745,lv=66}} },
 }
-local CD_SLOTS = { "BASH","GROWL","ENRAGE","FRENZIED_REGEN","BARKSKIN","MANGLE_BEAR","LACERATE" }
-local BEAR_FORM_IDS = {5487}
-local DIRE_BEAR_IDS = {9634}
+local CD_ORDER  = { "BASH","GROWL","ENRAGE","FRENZIED_REGEN","BARKSKIN","MANGLE_BEAR","LACERATE" }
+local MAUL_IDS  = {[6807]=true,[8972]=true,[9745]=true,[9880]=true,[9881]=true,[26996]=true,[26997]=true}
+local BEAR_IDS  = {5487, 9634}   -- Bear Form, Dire Bear Form
+local FF_IDS    = {16857,17390,17391,17392,27011}
+local DR_IDS    = {99,1735,9490,9747,9898,26998}
 
 -- ============================================================
--- FARBEN (WoW Classic Palette)
+-- FARBEN
 -- ============================================================
-local C = {
-    gold        = {0.784, 0.659, 0.294},   -- #c8a84b
-    gold_bright = {1.000, 0.843, 0.000},   -- #ffd700
-    gold_dim    = {0.400, 0.330, 0.130},
-    bg_dark     = {0.110, 0.082, 0.063},   -- #1c1510
-    bg_med      = {0.165, 0.122, 0.063},   -- #2a1f10
-    bg_light    = {0.200, 0.155, 0.100},
-    red_fill    = {0.545, 0.102, 0.039},   -- #8b1a0a
-    red_bright  = {0.800, 0.133, 0.000},
-    green       = {0.000, 0.800, 0.267},   -- #00cc44
-    green_dim   = {0.000, 0.350, 0.110},
-    orange      = {1.000, 0.549, 0.000},   -- #ff8c00
-    white       = {0.941, 0.910, 0.816},   -- #f0e8d0
-    grey        = {0.400, 0.333, 0.267},
-    grey_dim    = {0.220, 0.180, 0.140},
-}
-
--- SavedVariables
-GuardianHelperDB = GuardianHelperDB or {
-    locked = false,
-    scale  = 1.0,
-    alpha  = 0.95,
-    showOutOfCombat = true,
-    showRagebar     = true,
-    showCooldownText = true,
-    showStatusDots  = true,
-    soundOnFormLoss = false,
-    maulAlert       = true,
-    x = nil, y = nil,
-}
+local GOLD   = {0.784, 0.659, 0.294}
+local DGOLD  = {0.350, 0.290, 0.110}
+local BG1    = {0.110, 0.082, 0.063, 0.96}
+local BG2    = {0.160, 0.118, 0.059, 1.00}
+local RED    = {0.800, 0.100, 0.040}
+local REDBR  = {1.000, 0.200, 0.050}
+local GREEN  = {0.100, 0.850, 0.250}
+local ORANGE = {1.000, 0.549, 0.000}
+local WHITE  = {0.940, 0.910, 0.820}
+local GREY   = {0.420, 0.370, 0.300}
+local DKGREY = {0.180, 0.150, 0.110}
 
 -- ============================================================
--- HILFSFUNKTIONEN UI
+-- HILFSFUNKTIONEN
 -- ============================================================
-local function MakeTex(parent, level)
+local function CT(parent, level, r, g, b, a)
     local t = parent:CreateTexture(nil, level or "BACKGROUND")
+    t:SetColorTexture(r, g, b, a or 1)
     return t
 end
 
-local function SetColor(tex, col, a)
-    tex:SetColorTexture(col[1], col[2], col[3], a or 1)
-end
-
-local function MakeFont(parent, size, flags)
-    local f = parent:CreateFontString(nil, "OVERLAY")
-    f:SetFont("Fonts\\FRIZQT__.TTF", size or 10, flags or "OUTLINE")
+local function CF(parent, size, r, g, b)
+    local f = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    f:SetFont("Fonts\\FRIZQT__.TTF", size or 9, "OUTLINE")
+    f:SetTextColor(r or 1, g or 1, b or 1)
     return f
 end
 
--- WoW-Style Panel (gold border + dark bg)
-local function MakePanel(parent, w, h)
-    local f = CreateFrame("Frame", nil, parent)
-    f:SetSize(w, h)
-    -- Äußerer Gold-Rahmen
-    local outer = MakeTex(f, "BACKGROUND")
-    outer:SetAllPoints()
-    SetColor(outer, C.gold, 1)
-    -- Innerer dunkler Bereich
-    local inner = MakeTex(f, "BORDER")
-    inner:SetPoint("TOPLEFT",     f, "TOPLEFT",      1, -1)
-    inner:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -1,  1)
-    SetColor(inner, C.bg_dark, 0.97)
-    f.inner = inner
-    return f
-end
-
--- Gold Separator
-local function MakeSep(parent, yOff, xPad)
-    local s = MakeTex(parent, "ARTWORK")
+local function Sep(parent, y)
+    local s = CT(parent, "ARTWORK", DGOLD[1], DGOLD[2], DGOLD[3], 0.6)
     s:SetHeight(1)
-    s:SetPoint("TOPLEFT",  parent, "TOPLEFT",  xPad or 4, yOff)
-    s:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -(xPad or 4), yOff)
-    SetColor(s, C.gold_dim, 0.7)
+    s:SetPoint("TOPLEFT",  parent, "TOPLEFT",  4, y)
+    s:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -4, y)
     return s
 end
 
--- WoW-Style Button
-local function MakeButton(parent, w, h, text, onClick)
-    local b = CreateFrame("Button", nil, parent)
-    b:SetSize(w, h)
-    local bg = MakeTex(b, "BACKGROUND")
-    bg:SetAllPoints()
-    SetColor(bg, C.gold, 1)
-    local bgInner = MakeTex(b, "BORDER")
-    bgInner:SetPoint("TOPLEFT",     b, "TOPLEFT",      1, -1)
-    bgInner:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -1,  1)
-    SetColor(bgInner, C.bg_med, 1)
-    b.bgInner = bgInner
-    local lbl = MakeFont(b, 9)
-    lbl:SetAllPoints()
-    lbl:SetJustifyH("CENTER")
-    lbl:SetText(text)
-    lbl:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
-    b.lbl = lbl
-    b:SetScript("OnEnter", function() SetColor(bgInner, C.bg_light, 1) end)
-    b:SetScript("OnLeave", function() SetColor(bgInner, C.bg_med,   1) end)
-    if onClick then b:SetScript("OnClick", onClick) end
-    return b
-end
-
--- Checkbox im WoW-Stil
-local function MakeCheckbox(parent, label, yOff, db_key)
-    local f = CreateFrame("Frame", nil, parent)
-    f:SetSize(160, 14)
-    f:SetPoint("TOPLEFT", parent, "TOPLEFT", 10, yOff)
-
-    local box = CreateFrame("Button", nil, f)
-    box:SetSize(12, 12)
-    box:SetPoint("LEFT", f, "LEFT", 0, 0)
-
-    local boxBg = MakeTex(box, "BACKGROUND")
-    boxBg:SetAllPoints()
-    SetColor(boxBg, C.gold, 1)
-    local boxInner = MakeTex(box, "BORDER")
-    boxInner:SetPoint("TOPLEFT",     box, "TOPLEFT",      1, -1)
-    boxInner:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", -1,  1)
-    SetColor(boxInner, C.bg_dark, 1)
-
-    local check = MakeFont(box, 8)
-    check:SetAllPoints()
-    check:SetJustifyH("CENTER")
-    check:SetText(GuardianHelperDB[db_key] and "|cff00cc44✓|r" or "")
-
-    local lbl = MakeFont(f, 8)
-    lbl:SetPoint("LEFT", box, "RIGHT", 4, 0)
-    lbl:SetText(label)
-    lbl:SetTextColor(C.white[1], C.white[2], C.white[3])
-
-    box:SetScript("OnClick", function()
-        GuardianHelperDB[db_key] = not GuardianHelperDB[db_key]
-        check:SetText(GuardianHelperDB[db_key] and "|cff00cc44✓|r" or "")
-    end)
-    return f
-end
-
 -- ============================================================
--- HAUPTFRAME
+-- HAUPTRAHMEN (W=210, H wird unten gesetzt)
 -- ============================================================
 local W = 210
-local Frame = MakePanel(UIParent, W, 10)
-Frame:SetParent(UIParent)
+local Frame = CreateFrame("Frame", "GuardianHelperFrame", UIParent)
+Frame:SetWidth(W)
+Frame:SetHeight(130)
+Frame:SetPoint("CENTER", UIParent, "CENTER", 350, 0)
 Frame:SetMovable(true)
 Frame:EnableMouse(true)
 Frame:RegisterForDrag("LeftButton")
-Frame:SetScript("OnDragStart", function(s) if not GuardianHelperDB.locked then s:StartMoving() end end)
-Frame:SetScript("OnDragStop",  function(s)
+Frame:SetScript("OnDragStart", function(s)
+    if not (DB and DB.locked) then s:StartMoving() end
+end)
+Frame:SetScript("OnDragStop", function(s)
     s:StopMovingOrSizing()
-    local p, _, _, x, y = s:GetPoint()
-    GuardianHelperDB.x = x; GuardianHelperDB.y = y
+    if DB then
+        local _, _, _, x, y = s:GetPoint()
+        DB.x = x; DB.y = y
+    end
 end)
 Frame:SetFrameStrata("MEDIUM")
-Frame:SetFrameLevel(10)
 Frame:SetClampedToScreen(true)
 
--- === HEADER ===
-local headerBg = MakeTex(Frame, "ARTWORK")
-headerBg:SetHeight(18)
-headerBg:SetPoint("TOPLEFT",  Frame, "TOPLEFT",   1, -1)
-headerBg:SetPoint("TOPRIGHT", Frame, "TOPRIGHT",  -1, -1)
-SetColor(headerBg, C.bg_med, 1)
+-- Gold-Rahmen
+local fBorder = CT(Frame, "BACKGROUND", GOLD[1], GOLD[2], GOLD[3], 1)
+fBorder:SetAllPoints()
 
-local headerTitle = MakeFont(Frame, 10, "OUTLINE")
-headerTitle:SetPoint("LEFT", Frame, "TOPLEFT", 8, -10)
-headerTitle:SetText("🐻  GUARDIAN")
-headerTitle:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
+-- Dark BG
+local fBG = CT(Frame, "BORDER", BG1[1], BG1[2], BG1[3], BG1[4])
+fBG:SetPoint("TOPLEFT",     Frame, "TOPLEFT",      1, -1)
+fBG:SetPoint("BOTTOMRIGHT", Frame, "BOTTOMRIGHT",  -1,  1)
 
-local headerDot = MakeFont(Frame, 9, "OUTLINE")
-headerDot:SetPoint("RIGHT", Frame, "TOPRIGHT", -6, -10)
-headerDot:SetText("●")
-headerDot:SetTextColor(C.green[1], C.green[2], C.green[3])
+-- Header BG
+local hBG = CT(Frame, "ARTWORK", BG2[1], BG2[2], BG2[3], 1)
+hBG:SetHeight(18)
+hBG:SetPoint("TOPLEFT",  Frame, "TOPLEFT",  1, -1)
+hBG:SetPoint("TOPRIGHT", Frame, "TOPRIGHT", -1, -1)
 
-MakeSep(Frame, -19, 4)
+-- Header: Akzentlinie links
+local hLine = CT(Frame, "OVERLAY", GREEN[1], GREEN[2], GREEN[3], 1)
+hLine:SetSize(2, 18)
+hLine:SetPoint("TOPLEFT", Frame, "TOPLEFT", 1, -1)
 
--- === RAGE ===
-local rageLabel = MakeFont(Frame, 7, "OUTLINE")
-rageLabel:SetPoint("TOPLEFT", Frame, "TOPLEFT", 7, -26)
-rageLabel:SetText("RAGE")
-rageLabel:SetTextColor(C.gold_dim[1], C.gold_dim[2], C.gold_dim[3])
+-- Header Texte
+local hTitle = CF(Frame, 9, GOLD[1], GOLD[2], GOLD[3])
+hTitle:SetPoint("LEFT", Frame, "TOPLEFT", 8, -10)
+hTitle:SetText("🐻  GUARDIAN")
 
-local rageVal = MakeFont(Frame, 8, "OUTLINE")
-rageVal:SetPoint("TOPRIGHT", Frame, "TOPRIGHT", -6, -26)
-rageVal:SetText("0  /  100")
-rageVal:SetTextColor(C.white[1], C.white[2], C.white[3])
+local hDot = CF(Frame, 8, GREEN[1], GREEN[2], GREEN[3])
+hDot:SetPoint("RIGHT", Frame, "TOPRIGHT", -6, -10)
+hDot:SetText("●")
 
--- Track
-local rageTrack = MakeTex(Frame, "ARTWORK")
-rageTrack:SetHeight(8)
-rageTrack:SetPoint("TOPLEFT",  Frame, "TOPLEFT",  6, -36)
-rageTrack:SetPoint("TOPRIGHT", Frame, "TOPRIGHT", -6, -36)
-SetColor(rageTrack, C.bg_dark, 1)
+Sep(Frame, -19)
 
--- Border um Track
-local rageTrackBorder = MakeTex(Frame, "BORDER")
-rageTrackBorder:SetPoint("TOPLEFT",     rageTrack, "TOPLEFT",      -1,  1)
-rageTrackBorder:SetPoint("BOTTOMRIGHT", rageTrack, "BOTTOMRIGHT",   1, -1)
-SetColor(rageTrackBorder, C.gold_dim, 0.5)
+-- ============================================================
+-- RAGE BAR
+-- ============================================================
+local rLbl = CF(Frame, 7, DGOLD[1], DGOLD[2], DGOLD[3])
+rLbl:SetPoint("TOPLEFT", Frame, "TOPLEFT", 7, -26)
+rLbl:SetText("RAGE")
 
-local rageFill = MakeTex(Frame, "ARTWORK")
-rageFill:SetHeight(8)
-rageFill:SetPoint("TOPLEFT", rageTrack, "TOPLEFT", 0, 0)
-SetColor(rageFill, C.red_fill, 1)
+local rVal = CF(Frame, 8, WHITE[1], WHITE[2], WHITE[3])
+rVal:SetPoint("TOPRIGHT", Frame, "TOPRIGHT", -6, -26)
+rVal:SetText("0 / 100")
 
--- Highlight oben auf Bar
-local rageHL = MakeTex(Frame, "OVERLAY")
-rageHL:SetHeight(2)
-rageHL:SetPoint("TOPLEFT",  rageTrack, "TOPLEFT",  0, 0)
-rageHL:SetPoint("TOPRIGHT", rageTrack, "TOPRIGHT", 0, 0)
-SetColor(rageHL, {1,1,1}, 0.06)
+local rTrackBG = CT(Frame, "ARTWORK", DKGREY[1], DKGREY[2], DKGREY[3], 1)
+rTrackBG:SetHeight(8)
+rTrackBG:SetPoint("TOPLEFT",  Frame, "TOPLEFT",  6, -36)
+rTrackBG:SetPoint("TOPRIGHT", Frame, "TOPRIGHT", -6, -36)
 
-MakeSep(Frame, -46, 4)
+local rBorder = CT(Frame, "BACKGROUND", DGOLD[1], DGOLD[2], DGOLD[3], 0.5)
+rBorder:SetPoint("TOPLEFT",     rTrackBG, "TOPLEFT",     -1,  1)
+rBorder:SetPoint("BOTTOMRIGHT", rTrackBG, "BOTTOMRIGHT",  1, -1)
 
--- === MAUL ===
-local maulBg = MakeTex(Frame, "ARTWORK")
-maulBg:SetHeight(16)
-maulBg:SetPoint("TOPLEFT",  Frame, "TOPLEFT",  1, -48)
-maulBg:SetPoint("TOPRIGHT", Frame, "TOPRIGHT", -1, -48)
-SetColor(maulBg, C.bg_dark, 1)
+local rFill = CT(Frame, "OVERLAY", RED[1], RED[2], RED[3], 1)
+rFill:SetHeight(8)
+rFill:SetPoint("TOPLEFT", rTrackBG, "TOPLEFT", 0, 0)
+rFill:SetWidth(1)
 
-local maulIcon = MakeFont(Frame, 8, "OUTLINE")
-maulIcon:SetPoint("LEFT", Frame, "TOPLEFT", 8, -56)
-maulIcon:SetText("▪")
-maulIcon:SetTextColor(C.grey[1], C.grey[2], C.grey[3])
+local rHL = CT(Frame, "OVERLAY", 1, 1, 1, 0.07)
+rHL:SetHeight(2)
+rHL:SetPoint("TOPLEFT",  rTrackBG, "TOPLEFT",  0, 0)
+rHL:SetPoint("TOPRIGHT", rTrackBG, "TOPRIGHT", 0, 0)
 
-local maulText = MakeFont(Frame, 8, "OUTLINE")
-maulText:SetPoint("LEFT", Frame, "TOPLEFT", 18, -56)
-maulText:SetText("Maul — nicht aktiv")
-maulText:SetTextColor(C.grey[1], C.grey[2], C.grey[3])
+Sep(Frame, -46)
 
-MakeSep(Frame, -64, 4)
+-- ============================================================
+-- MAUL INDICATOR
+-- ============================================================
+local mBG = CT(Frame, "ARTWORK", DKGREY[1], DKGREY[2], DKGREY[3], 1)
+mBG:SetHeight(15)
+mBG:SetPoint("TOPLEFT",  Frame, "TOPLEFT",  1, -48)
+mBG:SetPoint("TOPRIGHT", Frame, "TOPRIGHT", -1, -48)
 
--- === FF & DR ===
--- FF
-local ffDot = MakeFont(Frame, 7, "OUTLINE")
-ffDot:SetPoint("TOPLEFT", Frame, "TOPLEFT", 7, -72)
-ffDot:SetText("●")
-ffDot:SetTextColor(C.grey[1], C.grey[2], C.grey[3])
+local mDot = CF(Frame, 7, GREY[1], GREY[2], GREY[3])
+mDot:SetPoint("LEFT", Frame, "TOPLEFT", 7, -56)
+mDot:SetText("▪")
 
-local ffLbl = MakeFont(Frame, 7, "OUTLINE")
-ffLbl:SetPoint("TOPLEFT", Frame, "TOPLEFT", 16, -72)
-ffLbl:SetText("FF")
-ffLbl:SetTextColor(C.gold_dim[1], C.gold_dim[2], C.gold_dim[3])
+local mTxt = CF(Frame, 8, GREY[1], GREY[2], GREY[3])
+mTxt:SetPoint("LEFT", Frame, "TOPLEFT", 16, -56)
+mTxt:SetText("Maul — nicht aktiv")
 
-local ffVal = MakeFont(Frame, 8, "OUTLINE")
-ffVal:SetPoint("TOPLEFT", Frame, "TOPLEFT", 30, -72)
-ffVal:SetText("---")
-ffVal:SetTextColor(C.grey[1], C.grey[2], C.grey[3])
+Sep(Frame, -64)
 
--- Vertikaler Trenner
-local vSep = MakeTex(Frame, "ARTWORK")
+-- ============================================================
+-- FF / DR ZEILE
+-- ============================================================
+local fDot = CF(Frame, 7, GREY[1], GREY[2], GREY[3])
+fDot:SetPoint("TOPLEFT", Frame, "TOPLEFT", 7, -72)
+fDot:SetText("●")
+
+local fLbl = CF(Frame, 7, DGOLD[1], DGOLD[2], DGOLD[3])
+fLbl:SetPoint("TOPLEFT", Frame, "TOPLEFT", 16, -72)
+fLbl:SetText("FF")
+
+local fVal = CF(Frame, 8, GREY[1], GREY[2], GREY[3])
+fVal:SetPoint("TOPLEFT", Frame, "TOPLEFT", 30, -72)
+fVal:SetText("---")
+
+local vSep = CT(Frame, "ARTWORK", DGOLD[1], DGOLD[2], DGOLD[3], 0.4)
 vSep:SetSize(1, 10)
 vSep:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2, -68)
-SetColor(vSep, C.gold_dim, 0.5)
 
--- DR
-local drDot = MakeFont(Frame, 7, "OUTLINE")
-drDot:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2 + 5, -72)
-drDot:SetText("●")
-drDot:SetTextColor(C.grey[1], C.grey[2], C.grey[3])
+local dDot = CF(Frame, 7, GREY[1], GREY[2], GREY[3])
+dDot:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2+5, -72)
+dDot:SetText("●")
 
-local drLbl = MakeFont(Frame, 7, "OUTLINE")
-drLbl:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2 + 14, -72)
-drLbl:SetText("DR")
-drLbl:SetTextColor(C.gold_dim[1], C.gold_dim[2], C.gold_dim[3])
+local dLbl = CF(Frame, 7, DGOLD[1], DGOLD[2], DGOLD[3])
+dLbl:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2+14, -72)
+dLbl:SetText("DR")
 
-local drVal = MakeFont(Frame, 8, "OUTLINE")
-drVal:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2 + 28, -72)
-drVal:SetText("---")
-drVal:SetTextColor(C.grey[1], C.grey[2], C.grey[3])
+local dVal = CF(Frame, 8, GREY[1], GREY[2], GREY[3])
+dVal:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2+28, -72)
+dVal:SetText("---")
 
-MakeSep(Frame, -79, 4)
+Sep(Frame, -79)
 
--- === COOLDOWNS ===
+-- ============================================================
+-- COOLDOWN SLOTS
+-- ============================================================
 local CD_SZ  = 26
 local CD_GAP = 2
-local cdFrames = {}
-local nCD = #CD_SLOTS
-local totalCDW = nCD * CD_SZ + (nCD-1) * CD_GAP
-local cdStartX = math.floor((W - totalCDW) / 2)
+local nCD    = #CD_ORDER
+local totW   = nCD * CD_SZ + (nCD - 1) * CD_GAP
+local cdX0   = math.floor((W - totW) / 2)
 
-for i, key in ipairs(CD_SLOTS) do
-    local xPos = cdStartX + (i-1) * (CD_SZ + CD_GAP)
+local cdSlots = {}
+for i, key in ipairs(CD_ORDER) do
+    local xp = cdX0 + (i-1) * (CD_SZ + CD_GAP)
+    local cf = CreateFrame("Frame", nil, Frame)
+    cf:SetSize(CD_SZ, CD_SZ + 9)
+    cf:SetPoint("TOPLEFT", Frame, "TOPLEFT", xp, -82)
 
-    local f = CreateFrame("Frame", nil, Frame)
-    f:SetSize(CD_SZ, CD_SZ + 9)
-    f:SetPoint("TOPLEFT", Frame, "TOPLEFT", xPos, -82)
+    local cborder = CT(cf, "BACKGROUND", DGOLD[1], DGOLD[2], DGOLD[3], 0.5)
+    cborder:SetAllPoints()
+    cf.border = cborder
 
-    -- Gold Rahmen
-    local border = MakeTex(f, "BACKGROUND")
-    border:SetAllPoints()
-    SetColor(border, C.gold, 1)
-    f.border = border
+    local cinner = CT(cf, "BORDER", DKGREY[1], DKGREY[2], DKGREY[3], 1)
+    cinner:SetPoint("TOPLEFT",     cf, "TOPLEFT",      1, -1)
+    cinner:SetPoint("BOTTOMRIGHT", cf, "BOTTOMRIGHT",  -1, 8)
+    cf.inner = cinner
 
-    -- Inneres
-    local inner = MakeTex(f, "BORDER")
-    inner:SetPoint("TOPLEFT",     f, "TOPLEFT",      1, -1)
-    inner:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",  -1, 8)
-    SetColor(inner, C.bg_dark, 1)
-    f.inner = inner
+    local ctimer = CF(cf, 9, GREY[1], GREY[2], GREY[3])
+    ctimer:SetPoint("CENTER", cf, "CENTER", 0, 4)
+    ctimer:SetText("?")
+    cf.timer = ctimer
 
-    -- Timer
-    local timer = MakeFont(f, 9, "OUTLINE")
-    timer:SetPoint("CENTER", f, "CENTER", 0, 4)
-    timer:SetText("?")
-    timer:SetTextColor(C.grey[1], C.grey[2], C.grey[3])
-    f.timer = timer
+    local clbl = CF(cf, 6, DGOLD[1], DGOLD[2], DGOLD[3])
+    clbl:SetPoint("BOTTOM", cf, "BOTTOM", 0, 1)
+    clbl:SetText(SPELL_GROUPS[key].label)
+    cf.lbl = clbl
 
-    -- Label
-    local lbl = MakeFont(f, 6, "OUTLINE")
-    lbl:SetPoint("BOTTOM", f, "BOTTOM", 0, 1)
-    lbl:SetText(SPELL_GROUPS[key].shortLabel or SPELL_GROUPS[key].label)
-    lbl:SetTextColor(C.gold_dim[1], C.gold_dim[2], C.gold_dim[3])
-    f.lbl = lbl
-
-    f.groupKey   = key
-    f.learnLevel = SPELL_GROUPS[key].ranks[1].level
-    cdFrames[i]  = f
+    cf.key      = key
+    cf.minLevel = SPELL_GROUPS[key].ranks[1].lv
+    cdSlots[i]  = cf
 end
 
 -- Footer
-local footerText = MakeFont(Frame, 6, "OUTLINE")
-footerText:SetPoint("BOTTOM", Frame, "BOTTOM", 0, 3)
-footerText:SetText("/gh lock  ·  /gh help")
-footerText:SetTextColor(C.grey_dim[1], C.grey_dim[2], C.grey_dim[3])
+local footer = CF(Frame, 6, 0.22, 0.18, 0.14)
+footer:SetPoint("BOTTOM", Frame, "BOTTOM", 0, 3)
+footer:SetText("/gh lock  ·  /gh help  ·  /gh config")
 
--- Frame Höhe setzen
-local FRAME_H = 82 + CD_SZ + 9 + 8
-Frame:SetHeight(FRAME_H)
+-- Frame Höhe final
+Frame:SetHeight(82 + CD_SZ + 9 + 8)
 
 -- ============================================================
 -- MINIMAP BUTTON
 -- ============================================================
-local MinimapBtn = CreateFrame("Button", "GuardianHelperMinimapBtn", Minimap)
-MinimapBtn:SetSize(28, 28)
-MinimapBtn:SetFrameStrata("MEDIUM")
-MinimapBtn:SetFrameLevel(8)
+local MM = CreateFrame("Button", "GHMinimapButton", Minimap)
+MM:SetSize(24, 24)
+MM:SetFrameStrata("MEDIUM")
+MM:SetFrameLevel(8)
+MM:SetMovable(true)
+MM:RegisterForDrag("LeftButton")
 
--- Runder Hintergrund
-local mmBg = MinimapBtn:CreateTexture(nil, "BACKGROUND")
-mmBg:SetAllPoints()
-mmBg:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
--- Goldener Kreis
-local mmCircle = MinimapBtn:CreateTexture(nil, "BORDER")
-mmCircle:SetSize(22, 22)
-mmCircle:SetPoint("CENTER")
-SetColor(mmCircle, C.gold, 1)
-local mmInner = MinimapBtn:CreateTexture(nil, "ARTWORK")
-mmInner:SetSize(20, 20)
-mmInner:SetPoint("CENTER")
-SetColor(mmInner, C.bg_dark, 1)
-
-local mmIcon = MakeFont(MinimapBtn, 12, "OUTLINE")
+local mmRing = CT(MM, "BACKGROUND", GOLD[1], GOLD[2], GOLD[3], 1)
+mmRing:SetAllPoints()
+local mmBG   = CT(MM, "BORDER", BG1[1], BG1[2], BG1[3], 1)
+mmBG:SetPoint("TOPLEFT",     MM, "TOPLEFT",      2, -2)
+mmBG:SetPoint("BOTTOMRIGHT", MM, "BOTTOMRIGHT",  -2,  2)
+local mmIcon = CF(MM, 11, 1, 1, 1)
 mmIcon:SetAllPoints()
 mmIcon:SetJustifyH("CENTER")
 mmIcon:SetJustifyV("MIDDLE")
 mmIcon:SetText("🐻")
 
--- Position auf der Minimap
 local mmAngle = 220
-local function UpdateMinimapPos()
-    local rad = math.rad(mmAngle)
-    local x = math.cos(rad) * 80
-    local y = math.sin(rad) * 80
-    MinimapBtn:SetPoint("CENTER", Minimap, "CENTER", x, y)
+local function SetMMPos()
+    local r = math.rad(mmAngle)
+    MM:SetPoint("CENTER", Minimap, "CENTER", math.cos(r)*80, math.sin(r)*80)
 end
-UpdateMinimapPos()
+SetMMPos()
 
--- Drag auf Minimap
-MinimapBtn:RegisterForDrag("LeftButton")
-MinimapBtn:SetScript("OnDragStart", function(self)
+MM:SetScript("OnDragStart", function(self)
     self:SetScript("OnUpdate", function()
         local mx, my = Minimap:GetCenter()
         local cx, cy = GetCursorPosition()
-        local scale  = UIParent:GetEffectiveScale()
-        cx, cy = cx/scale, cy/scale
-        mmAngle = math.deg(math.atan2(cy - my, cx - mx))
-        UpdateMinimapPos()
+        local s = UIParent:GetEffectiveScale()
+        mmAngle = math.deg(math.atan2(cy/s - my, cx/s - mx))
+        SetMMPos()
     end)
 end)
-MinimapBtn:SetScript("OnDragStop", function(self)
+MM:SetScript("OnDragStop", function(self)
     self:SetScript("OnUpdate", nil)
 end)
-
-MinimapBtn:SetScript("OnClick", function()
-    if Frame:IsShown() then Frame:Hide()
-    else Frame:Show() end
+MM:SetScript("OnClick", function()
+    if Frame:IsShown() then Frame:Hide() else Frame:Show() end
 end)
-
-MinimapBtn:SetScript("OnEnter", function(self)
+MM:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetText("GuardianHelper v"..GH_VERSION, C.gold[1], C.gold[2], C.gold[3])
+    GameTooltip:SetText("|cffC8A84BGuardianHelper|r v"..VERSION)
     GameTooltip:AddLine("Klick: Ein/Ausblenden", 1, 1, 1)
-    GameTooltip:AddLine("Drag: Position ändern", 0.7, 0.7, 0.7)
+    GameTooltip:AddLine("Drag: Verschieben", 0.7, 0.7, 0.7)
     GameTooltip:Show()
 end)
-MinimapBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+MM:SetScript("OnLeave", GameTooltip.Hide)
 
 -- ============================================================
--- CONFIG PANEL
+-- CONFIG PANEL (einfach & robust)
 -- ============================================================
-local ConfigFrame = MakePanel(UIParent, 200, 220)
-ConfigFrame:SetPoint("CENTER", UIParent, "CENTER", 50, 0)
-ConfigFrame:SetFrameStrata("HIGH")
-ConfigFrame:SetFrameLevel(50)
-ConfigFrame:Hide()
-ConfigFrame:EnableMouse(true)
-ConfigFrame:SetMovable(true)
-ConfigFrame:RegisterForDrag("LeftButton")
-ConfigFrame:SetScript("OnDragStart", function(s) s:StartMoving() end)
-ConfigFrame:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
+local CFG = CreateFrame("Frame", "GHConfigFrame", UIParent)
+CFG:SetSize(200, 160)
+CFG:SetPoint("CENTER", UIParent, "CENTER", 50, 50)
+CFG:SetFrameStrata("HIGH")
+CFG:SetFrameLevel(50)
+CFG:SetMovable(true)
+CFG:EnableMouse(true)
+CFG:RegisterForDrag("LeftButton")
+CFG:SetScript("OnDragStart", function(s) s:StartMoving() end)
+CFG:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
+CFG:Hide()
 
--- Config Header
-local cfgHeader = MakeTex(ConfigFrame, "ARTWORK")
-cfgHeader:SetHeight(18)
-cfgHeader:SetPoint("TOPLEFT",  ConfigFrame, "TOPLEFT",  1, -1)
-cfgHeader:SetPoint("TOPRIGHT", ConfigFrame, "TOPRIGHT", -1, -1)
-SetColor(cfgHeader, C.bg_med, 1)
+CT(CFG, "BACKGROUND", GOLD[1], GOLD[2], GOLD[3], 1):SetAllPoints()
+local cfgBG = CT(CFG, "BORDER", BG1[1], BG1[2], BG1[3], BG1[4])
+cfgBG:SetPoint("TOPLEFT", CFG, "TOPLEFT", 1, -1)
+cfgBG:SetPoint("BOTTOMRIGHT", CFG, "BOTTOMRIGHT", -1, 1)
 
-local cfgTitle = MakeFont(ConfigFrame, 9, "OUTLINE")
-cfgTitle:SetPoint("CENTER", ConfigFrame, "TOP", 0, -10)
+local cfgHdr = CT(CFG, "ARTWORK", BG2[1], BG2[2], BG2[3], 1)
+cfgHdr:SetHeight(18)
+cfgHdr:SetPoint("TOPLEFT",  CFG, "TOPLEFT",  1, -1)
+cfgHdr:SetPoint("TOPRIGHT", CFG, "TOPRIGHT", -1, -1)
+
+local cfgTitle = CF(CFG, 9, GOLD[1], GOLD[2], GOLD[3])
+cfgTitle:SetPoint("CENTER", CFG, "TOP", 0, -10)
 cfgTitle:SetText("⚙  GuardianHelper Config")
-cfgTitle:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
 
-local cfgClose = CreateFrame("Button", nil, ConfigFrame)
-cfgClose:SetSize(14, 14)
-cfgClose:SetPoint("TOPRIGHT", ConfigFrame, "TOPRIGHT", -4, -3)
-local cfgCloseLbl = MakeFont(cfgClose, 9, "OUTLINE")
-cfgCloseLbl:SetAllPoints()
-cfgCloseLbl:SetJustifyH("CENTER")
-cfgCloseLbl:SetText("✕")
-cfgCloseLbl:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
-cfgClose:SetScript("OnClick", function() ConfigFrame:Hide() end)
+local cfgX = CreateFrame("Button", nil, CFG)
+cfgX:SetSize(16, 16)
+cfgX:SetPoint("TOPRIGHT", CFG, "TOPRIGHT", -4, -2)
+local cfgXL = CF(cfgX, 10, GOLD[1], GOLD[2], GOLD[3])
+cfgXL:SetAllPoints(); cfgXL:SetJustifyH("CENTER"); cfgXL:SetText("✕")
+cfgX:SetScript("OnClick", function() CFG:Hide() end)
 
-MakeSep(ConfigFrame, -19, 4)
+Sep(CFG, -19)
 
--- Checkboxen
-local cb1 = MakeCheckbox(ConfigFrame, "Maul Queue Alert",       -26, "maulAlert")
-local cb2 = MakeCheckbox(ConfigFrame, "Sound bei Formverlust",  -42, "soundOnFormLoss")
-local cb3 = MakeCheckbox(ConfigFrame, "Nur in Kampf anzeigen",  -58, "showOutOfCombat")
+-- Einfache Checkbox-Funktion
+local cfgChecks = {}
+local function AddCheck(label, key, yOff)
+    local btn = CreateFrame("Button", nil, CFG)
+    btn:SetSize(180, 14)
+    btn:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, yOff)
 
-MakeSep(ConfigFrame, -74, 4)
+    local box = CT(btn, "BACKGROUND", GOLD[1], GOLD[2], GOLD[3], 0.7)
+    box:SetSize(10, 10)
+    box:SetPoint("LEFT", btn, "LEFT", 0, 0)
 
--- Section Label
-local dispLbl = MakeFont(ConfigFrame, 7, "OUTLINE")
-dispLbl:SetPoint("TOPLEFT", ConfigFrame, "TOPLEFT", 10, -80)
-dispLbl:SetText("DISPLAY")
-dispLbl:SetTextColor(C.gold_dim[1], C.gold_dim[2], C.gold_dim[3])
+    local check = CF(btn, 8, GREEN[1], GREEN[2], GREEN[3])
+    check:SetSize(10, 10)
+    check:SetPoint("LEFT", btn, "LEFT", 1, 0)
+    check:SetJustifyH("CENTER")
+    check:SetText(DB and DB[key] and "✓" or "")
+    btn.check = check
 
-local cb4 = MakeCheckbox(ConfigFrame, "Ragebar anzeigen",   -90,  "showRagebar")
-local cb5 = MakeCheckbox(ConfigFrame, "Cooldown-Text",      -106, "showCooldownText")
-local cb6 = MakeCheckbox(ConfigFrame, "Status-Dots",        -122, "showStatusDots")
+    local lbl = CF(btn, 8, WHITE[1], WHITE[2], WHITE[3])
+    lbl:SetPoint("LEFT", btn, "LEFT", 14, 0)
+    lbl:SetText(label)
 
-MakeSep(ConfigFrame, -136, 4)
+    btn:SetScript("OnClick", function()
+        if DB then
+            DB[key] = not DB[key]
+            check:SetText(DB[key] and "✓" or "")
+        end
+    end)
+    cfgChecks[key] = btn
+end
 
--- Opacity Buttons (+ / - statt Slider, TBC-kompatibel)
-local opLbl = MakeFont(ConfigFrame, 7, "OUTLINE")
-opLbl:SetPoint("TOPLEFT", ConfigFrame, "TOPLEFT", 10, -142)
-opLbl:SetText("Opacity")
-opLbl:SetTextColor(C.gold_dim[1], C.gold_dim[2], C.gold_dim[3])
+Sep(CFG, -19)
+AddCheck("Maul Queue Alert",      "maulAlert",       -28)
+AddCheck("Sound bei Formverlust", "soundFormLoss",   -44)
+AddCheck("Nur in Kampf zeigen",   "combatOnly",      -60)
+Sep(CFG, -74)
 
-local opVal = MakeFont(ConfigFrame, 8, "OUTLINE")
-opVal:SetPoint("TOPLEFT", ConfigFrame, "TOPLEFT", 10, -155)
-opVal:SetText(string.format("%.0f%%", (GuardianHelperDB.alpha or 0.95) * 100))
-opVal:SetTextColor(C.white[1], C.white[2], C.white[3])
+local opLbl = CF(CFG, 7, DGOLD[1], DGOLD[2], DGOLD[3])
+opLbl:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -80)
+opLbl:SetText("Opacity:")
 
-local opMinus = MakeButton(ConfigFrame, 30, 14, "  −  ", function()
-    GuardianHelperDB.alpha = math.max(0.3, (GuardianHelperDB.alpha or 0.95) - 0.05)
-    Frame:SetAlpha(GuardianHelperDB.alpha)
-    opVal:SetText(string.format("%.0f%%", GuardianHelperDB.alpha * 100))
+local opVal = CF(CFG, 8, WHITE[1], WHITE[2], WHITE[3])
+opVal:SetPoint("TOPLEFT", CFG, "TOPLEFT", 58, -80)
+opVal:SetText("95%")
+
+local function MakeBtn(label, xOff, yOff, onClick)
+    local b = CreateFrame("Button", nil, CFG)
+    b:SetSize(28, 16)
+    b:SetPoint("TOPLEFT", CFG, "TOPLEFT", xOff, yOff)
+    CT(b, "BACKGROUND", GOLD[1], GOLD[2], GOLD[3], 0.8):SetAllPoints()
+    CT(b, "BORDER", BG2[1], BG2[2], BG2[3], 1):SetPoint("TOPLEFT",b,"TOPLEFT",1,-1)
+    CT(b, "BORDER", BG2[1], BG2[2], BG2[3], 1):SetPoint("BOTTOMRIGHT",b,"BOTTOMRIGHT",-1,1)
+    local l = CF(b, 8, GOLD[1], GOLD[2], GOLD[3])
+    l:SetAllPoints(); l:SetJustifyH("CENTER"); l:SetText(label)
+    b:SetScript("OnClick", onClick)
+    return b
+end
+
+MakeBtn("  −  ", 100, -76, function()
+    if not DB then return end
+    DB.alpha = math.max(0.3, DB.alpha - 0.05)
+    Frame:SetAlpha(DB.alpha)
+    opVal:SetText(string.format("%d%%", DB.alpha * 100))
 end)
-opMinus:SetPoint("TOPLEFT", ConfigFrame, "TOPLEFT", 60, -151)
-
-local opPlus = MakeButton(ConfigFrame, 30, 14, "  +  ", function()
-    GuardianHelperDB.alpha = math.min(1.0, (GuardianHelperDB.alpha or 0.95) + 0.05)
-    Frame:SetAlpha(GuardianHelperDB.alpha)
-    opVal:SetText(string.format("%.0f%%", GuardianHelperDB.alpha * 100))
+MakeBtn("  +  ", 132, -76, function()
+    if not DB then return end
+    DB.alpha = math.min(1.0, DB.alpha + 0.05)
+    Frame:SetAlpha(DB.alpha)
+    opVal:SetText(string.format("%d%%", DB.alpha * 100))
 end)
-opPlus:SetPoint("TOPLEFT", ConfigFrame, "TOPLEFT", 94, -151)
 
-MakeSep(ConfigFrame, -178, 4)
+Sep(CFG, -100)
 
--- Buttons
-local btnSave = MakeButton(ConfigFrame, 80, 18, "Speichern", function()
-    print("|cff" .. string.format("%02x%02x%02x", math.floor(C.gold[1]*255), math.floor(C.gold[2]*255), math.floor(C.gold[3]*255)) .. "GuardianHelper:|r Einstellungen gespeichert.")
-    ConfigFrame:Hide()
+local btnSave = MakeBtn("Speichern", 15, -108, function()
+    print("|cffC8A84BGuardianHelper:|r Gespeichert.")
+    CFG:Hide()
 end)
-btnSave:SetPoint("BOTTOMLEFT", ConfigFrame, "BOTTOMLEFT", 8, 6)
+btnSave:SetSize(80, 18)
+btnSave:SetPoint("BOTTOMLEFT", CFG, "BOTTOMLEFT", 8, 6)
 
-local btnCancel = MakeButton(ConfigFrame, 80, 18, "Abbrechen", function()
-    ConfigFrame:Hide()
-end)
-btnCancel:SetPoint("BOTTOMRIGHT", ConfigFrame, "BOTTOMRIGHT", -8, 6)
+local btnCancel = MakeBtn("Abbrechen", 110, -108, function() CFG:Hide() end)
+btnCancel:SetSize(80, 18)
+btnCancel:SetPoint("BOTTOMRIGHT", CFG, "BOTTOMRIGHT", -8, 6)
 
 -- ============================================================
--- SPELL CACHE & ACTION BAR UPDATE
+-- SPELL CACHE
 -- ============================================================
-local spellCache = {}
+local cache = {}
 
-local function RebuildSpellCache()
-    for k in pairs(spellCache) do spellCache[k] = nil end
+local function BuildCache()
+    cache = {}
     local i = 1
     while true do
         local name = GetSpellBookItemName(i, BOOKTYPE_SPELL)
         if not name then break end
-        local _, spellID = GetSpellBookItemInfo(i, BOOKTYPE_SPELL)
-        for groupKey, group in pairs(SPELL_GROUPS) do
-            for _, rd in ipairs(group.ranks) do
-                if rd.id == spellID then
-                    if not spellCache[groupKey] then
-                        spellCache[groupKey] = {highestID=spellID, highestLevel=rd.level, highestSlot=i, allKnownIDs={}}
-                    elseif rd.level > spellCache[groupKey].highestLevel then
-                        spellCache[groupKey].highestID=spellID; spellCache[groupKey].highestLevel=rd.level; spellCache[groupKey].highestSlot=i
+        local _, sid = GetSpellBookItemInfo(i, BOOKTYPE_SPELL)
+        if sid then
+            for key, grp in pairs(SPELL_GROUPS) do
+                for _, rd in ipairs(grp.ranks) do
+                    if rd.id == sid then
+                        local c = cache[key]
+                        if not c or rd.lv > c.lv then
+                            cache[key] = {id=sid, lv=rd.lv, slot=i}
+                        end
                     end
-                    spellCache[groupKey].allKnownIDs[spellID] = true
                 end
             end
         end
@@ -549,247 +452,217 @@ local function RebuildSpellCache()
     end
 end
 
-local function UpdateActionBarsForGroup(groupKey)
-    local group = SPELL_GROUPS[groupKey]
-    if not group.autoUpdate then return end
-    local cache = spellCache[groupKey]
-    if not cache then return end
-    local updated = 0
-    for slot = 1, 120 do
-        local aType, aID = GetActionInfo(slot)
-        if aType == "spell" and aID ~= cache.highestID and cache.allKnownIDs[aID] then
-            ClearCursor(); PickupSpellBookItem(cache.highestSlot, BOOKTYPE_SPELL); PlaceAction(slot); ClearCursor()
-            updated = updated + 1
+-- ============================================================
+-- STATUS HILFSFUNKTIONEN
+-- ============================================================
+local function InBearForm()
+    for _, id in ipairs(BEAR_IDS) do
+        local n = GetSpellInfo(id)
+        if n then
+            for i = 1, 40 do
+                local bn = UnitBuff("player", i)
+                if not bn then break end
+                if bn == n then return true, id == 9634 end
+            end
         end
     end
-    if updated > 0 then
-        print("|cffC8A84BGuardianHelper:|r " .. (GetSpellInfo(cache.highestID) or groupKey) .. " aktualisiert ("..updated.."x)")
-    end
+    return false, false
 end
 
-local function UpdateAllActionBars()
-    for k in pairs(SPELL_GROUPS) do UpdateActionBarsForGroup(k) end
-end
-
--- ============================================================
--- MAUL TRACKING
--- ============================================================
-local State = {maulQueued=false}
-local maulIDs = {}
-local function RebuildMaulIDs()
-    maulIDs = {}
-    local c = spellCache["MAUL"]
-    if c then for id in pairs(c.allKnownIDs) do maulIDs[id] = true end end
-end
-
--- ============================================================
--- HILFSFUNKTIONEN STATUS
--- ============================================================
-local function GetTargetDebuffRem(spellID)
-    local n = GetSpellInfo(spellID); if not n then return nil end
-    for i=1,40 do
-        local name,_,_,_,_,_,exp = UnitDebuff("target",i)
-        if not name then break end
-        if name==n then return exp and exp>0 and (exp-GetTime()) or math.huge end
+local function DebuffOnTarget(idList)
+    for _, id in ipairs(idList) do
+        local n = GetSpellInfo(id)
+        if n then
+            for i = 1, 40 do
+                local dn, _, _, _, _, _, exp = UnitDebuff("target", i)
+                if not dn then break end
+                if dn == n then
+                    return exp and exp > 0 and (exp - GetTime()) or 999
+                end
+            end
+        end
     end
     return nil
 end
 
-local function GetPlayerBuffRem(spellID)
-    local n = GetSpellInfo(spellID); if not n then return nil end
-    for i=1,40 do
-        local name,_,_,_,_,_,exp = UnitBuff("player",i)
-        if not name then break end
-        if name==n then return exp and exp>0 and (exp-GetTime()) or math.huge end
-    end
-    return nil
+local function GetCD(key)
+    local c = cache[key]; if not c then return nil end
+    local s, d = GetSpellCooldown(c.id)
+    if not s or s == 0 then return 0 end
+    local r = (s + d) - GetTime()
+    return r > 0 and r or 0
 end
 
-local function IsInBearForm()
-    for _,id in ipairs(BEAR_FORM_IDS) do if GetPlayerBuffRem(id) then return true,false end end
-    for _,id in ipairs(DIRE_BEAR_IDS) do if GetPlayerBuffRem(id) then return true,true  end end
-    return false,false
-end
-
-local function GetDebuffOnTarget(groupKey)
-    local c = spellCache[groupKey]; if not c then return nil end
-    for id in pairs(c.allKnownIDs) do local r=GetTargetDebuffRem(id); if r then return r end end
-    return nil
-end
-
-local function GetGroupCD(groupKey)
-    local c = spellCache[groupKey]; if not c then return nil end
-    local s,d = GetSpellCooldown(c.highestID)
-    if not s or s==0 then return 0 end
-    local r=(s+d)-GetTime(); return r>0 and r or 0
-end
+-- ============================================================
+-- STATE
+-- ============================================================
+local maulQueued = false
 
 -- ============================================================
 -- EVENTS
 -- ============================================================
 local EF = CreateFrame("Frame")
+EF:RegisterEvent("ADDON_LOADED")
 EF:RegisterEvent("PLAYER_LOGIN")
 EF:RegisterEvent("PLAYER_LEVEL_UP")
 EF:RegisterEvent("SPELLS_CHANGED")
-EF:RegisterEvent("LEARNED_SPELL_IN_TAB")
 EF:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 
 EF:SetScript("OnEvent", function(self, event, ...)
-    if event == "PLAYER_LOGIN" then
-        RebuildSpellCache(); RebuildMaulIDs()
-        Frame:SetAlpha(GuardianHelperDB.alpha)
-        Frame:SetScale(GuardianHelperDB.scale)
-        if GuardianHelperDB.x then
+    if event == "ADDON_LOADED" and ... == "GuardianHelper" then
+        -- DB nach SavedVariables-Laden initialisieren
+        GuardianHelperDB = GuardianHelperDB or {}
+        DB = GuardianHelperDB
+        DB.alpha      = DB.alpha or 0.95
+        DB.locked     = DB.locked or false
+        DB.maulAlert  = DB.maulAlert == nil and true or DB.maulAlert
+        Frame:SetAlpha(DB.alpha)
+        if DB.x and DB.y then
             Frame:ClearAllPoints()
-            Frame:SetPoint("CENTER", UIParent, "CENTER", GuardianHelperDB.x, GuardianHelperDB.y)
-        else
-            Frame:SetPoint("CENTER", UIParent, "CENTER", 350, 0)
+            Frame:SetPoint("CENTER", UIParent, "CENTER", DB.x, DB.y)
         end
-        print("|cffC8A84BGuardianHelper|r v"..GH_VERSION.." — Bereit. 🐻  |cffaaaaaa/gh help|r")
+        opVal:SetText(string.format("%d%%", DB.alpha * 100))
+
+    elseif event == "PLAYER_LOGIN" then
+        BuildCache()
+        print("|cffC8A84BGuardianHelper|r v"..VERSION.." bereit  🐻  |cffaaaaaa/gh help|r")
 
     elseif event == "PLAYER_LEVEL_UP" then
-        local lvl = ...
-        local df=CreateFrame("Frame"); local el=0
-        df:SetScript("OnUpdate",function(s,e) el=el+e; if el>=0.5 then s:SetScript("OnUpdate",nil); RebuildSpellCache(); RebuildMaulIDs(); UpdateAllActionBars(); print("|cffC8A84BGuardianHelper:|r Level "..lvl.." — Aktionsleisten geprüft!") end end)
+        local df = CreateFrame("Frame"); local el = 0
+        df:SetScript("OnUpdate", function(s,e)
+            el = el + e
+            if el >= 0.5 then s:SetScript("OnUpdate",nil); BuildCache() end
+        end)
 
     elseif event == "SPELLS_CHANGED" then
-        RebuildSpellCache(); RebuildMaulIDs()
-
-    elseif event == "LEARNED_SPELL_IN_TAB" then
-        local df=CreateFrame("Frame"); local el=0
-        df:SetScript("OnUpdate",function(s,e) el=el+e; if el>=0.3 then s:SetScript("OnUpdate",nil); RebuildSpellCache(); RebuildMaulIDs(); UpdateAllActionBars() end end)
+        BuildCache()
 
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
-        local _,subEvent,_,srcGUID,_,_,_,_,_,_,_,spellID = ...
-        if srcGUID ~= UnitGUID("player") then return end
-        if subEvent=="SPELL_CAST_START" and maulIDs[spellID] then State.maulQueued=true
-        elseif (subEvent=="SPELL_DAMAGE" or subEvent=="SPELL_MISSED") and maulIDs[spellID] then State.maulQueued=false end
+        local _, sub, _, guid, _, _, _, _, _, _, _, sid = ...
+        if guid ~= UnitGUID("player") then return end
+        if sub == "SPELL_CAST_START" and MAUL_IDS[sid] then
+            maulQueued = true
+        elseif (sub == "SPELL_DAMAGE" or sub == "SPELL_MISSED") and MAUL_IDS[sid] then
+            maulQueued = false
+        end
     end
 end)
 
 -- ============================================================
 -- UPDATE LOOP
 -- ============================================================
-local throttle = 0
-Frame:SetScript("OnUpdate", function(self, elapsed)
-    throttle = throttle + elapsed
-    if throttle < 0.12 then return end
-    throttle = 0
+local tick = 0
+Frame:SetScript("OnUpdate", function(self, dt)
+    tick = tick + dt
+    if tick < 0.15 then return end
+    tick = 0
 
-    -- RAGE
-    local rage    = UnitPower("player",1)
-    local rageMax = UnitPowerMax("player",1)
-    if rageMax==0 then rageMax=100 end
-    local pct = rage/rageMax
-    local tw = rageTrack:GetWidth()
-    if tw and tw > 0 then
-        rageFill:SetWidth(math.max(tw*pct, 1))
-    end
-    rageVal:SetText(rage.."  /  "..rageMax)
-
-    if pct>=0.7 then
-        SetColor(rageFill, C.red_bright, 1)
-    elseif pct>=0.35 then
-        SetColor(rageFill, C.red_fill, 1)
+    -- Rage
+    local rage    = UnitPower("player", 1)
+    local rageMax = UnitPowerMax("player", 1)
+    if rageMax < 1 then rageMax = 100 end
+    local pct = rage / rageMax
+    local tw  = rTrackBG:GetWidth()
+    if tw and tw > 2 then rFill:SetWidth(math.max(tw * pct, 1)) end
+    rVal:SetText(rage .. " / " .. rageMax)
+    if pct >= 0.7 then
+        rFill:SetColorTexture(REDBR[1], REDBR[2], REDBR[3], 1)
     else
-        SetColor(rageFill, {0.3,0.05,0.02}, 1)
+        rFill:SetColorTexture(RED[1], RED[2], RED[3], 1)
     end
 
-    -- BEAR FORM
-    local inBear, isDire = IsInBearForm()
+    -- Bear Form
+    local inBear, isDire = InBearForm()
     if inBear then
-        headerDot:SetTextColor(C.green[1], C.green[2], C.green[3])
-        headerTitle:SetText(isDire and "🐻  DIRE BEAR" or "🐻  BEAR FORM")
-        headerTitle:SetTextColor(C.gold[1], C.gold[2], C.gold[3])
+        hLine:SetColorTexture(GREEN[1], GREEN[2], GREEN[3], 1)
+        hDot:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
+        hDot:SetText("●")
+        hTitle:SetText(isDire and "🐻  DIRE BEAR" or "🐻  BEAR FORM")
+        hTitle:SetTextColor(GOLD[1], GOLD[2], GOLD[3])
     else
-        headerDot:SetTextColor(C.red_bright[1] or 0.8, 0.133, 0)
-        headerTitle:SetText("⚠  KEINE BÄRENFORM")
-        headerTitle:SetTextColor(C.red_bright[1] or 0.8, 0.2, 0.0)
+        hLine:SetColorTexture(REDBR[1], REDBR[2], REDBR[3], 1)
+        hDot:SetTextColor(REDBR[1], REDBR[2], REDBR[3])
+        hDot:SetText("⚠")
+        hTitle:SetText("  KEINE BÄRENFORM")
+        hTitle:SetTextColor(REDBR[1], REDBR[2], REDBR[3])
     end
 
-    -- MAUL
-    if State.maulQueued then
-        SetColor(maulBg, {0.20,0.10,0.00}, 1)
-        maulIcon:SetTextColor(C.orange[1], C.orange[2], C.orange[3])
-        maulText:SetText("⚔  MAUL READY")
-        maulText:SetTextColor(C.orange[1], C.orange[2], C.orange[3])
+    -- Maul
+    if maulQueued then
+        mBG:SetColorTexture(0.18, 0.09, 0, 1)
+        mDot:SetTextColor(ORANGE[1], ORANGE[2], ORANGE[3])
+        mTxt:SetText("⚔  MAUL READY")
+        mTxt:SetTextColor(ORANGE[1], ORANGE[2], ORANGE[3])
     else
-        SetColor(maulBg, C.bg_dark, 1)
-        maulIcon:SetTextColor(C.grey[1], C.grey[2], C.grey[3])
-        maulText:SetText("Maul — nicht aktiv")
-        maulText:SetTextColor(C.grey[1], C.grey[2], C.grey[3])
+        mBG:SetColorTexture(DKGREY[1], DKGREY[2], DKGREY[3], 1)
+        mDot:SetTextColor(GREY[1], GREY[2], GREY[3])
+        mTxt:SetText("Maul — nicht aktiv")
+        mTxt:SetTextColor(GREY[1], GREY[2], GREY[3])
     end
 
-    -- FAERIE FIRE
+    -- Faerie Fire
     if UnitExists("target") then
-        local r = GetDebuffOnTarget("FAERIE_FIRE")
-        local known = spellCache["FAERIE_FIRE"] ~= nil
-        if not known then
-            ffDot:SetTextColor(C.grey_dim[1],C.grey_dim[2],C.grey_dim[3])
-            ffVal:SetText("--"); ffVal:SetTextColor(C.grey_dim[1],C.grey_dim[2],C.grey_dim[3])
-        elseif r then
-            ffDot:SetTextColor(C.green[1],C.green[2],C.green[3])
-            local t = r==math.huge and "∞" or string.format("%.0fs",r)
-            ffVal:SetText(t)
-            ffVal:SetTextColor((r~=math.huge and r<4) and C.orange[1] or C.green[1],
-                               (r~=math.huge and r<4) and C.orange[2] or C.green[2],
-                               (r~=math.huge and r<4) and C.orange[3] or C.green[3])
-        else
-            ffDot:SetTextColor(C.red_bright[1] or 0.8,0.133,0)
-            ffVal:SetText("!"); ffVal:SetTextColor(C.red_bright[1] or 0.8,0.133,0)
-        end
-    else
-        ffDot:SetTextColor(C.grey_dim[1],C.grey_dim[2],C.grey_dim[3])
-        ffVal:SetText("---"); ffVal:SetTextColor(C.grey_dim[1],C.grey_dim[2],C.grey_dim[3])
-    end
-
-    -- DEMO ROAR
-    if UnitExists("target") then
-        local r = GetDebuffOnTarget("DEMO_ROAR")
+        local r = DebuffOnTarget(FF_IDS)
         if r then
-            drDot:SetTextColor(C.green[1],C.green[2],C.green[3])
-            local t = r==math.huge and "∞" or string.format("%.0fs",r)
-            drVal:SetText(t)
-            drVal:SetTextColor((r~=math.huge and r<3) and C.orange[1] or C.green[1],
-                               (r~=math.huge and r<3) and C.orange[2] or C.green[2],
-                               (r~=math.huge and r<3) and C.orange[3] or C.green[3])
+            fDot:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
+            local t = r >= 999 and "∞" or string.format("%ds", math.floor(r))
+            fVal:SetText(t)
+            fVal:SetTextColor(r < 4 and ORANGE[1] or GREEN[1], r < 4 and ORANGE[2] or GREEN[2], r < 4 and ORANGE[3] or GREEN[3])
         else
-            drDot:SetTextColor(C.red_bright[1] or 0.8,0.133,0)
-            drVal:SetText("!"); drVal:SetTextColor(C.red_bright[1] or 0.8,0.133,0)
+            fDot:SetTextColor(REDBR[1], REDBR[2], REDBR[3])
+            fVal:SetText("!")
+            fVal:SetTextColor(REDBR[1], REDBR[2], REDBR[3])
         end
     else
-        drDot:SetTextColor(C.grey_dim[1],C.grey_dim[2],C.grey_dim[3])
-        drVal:SetText("---"); drVal:SetTextColor(C.grey_dim[1],C.grey_dim[2],C.grey_dim[3])
+        fDot:SetTextColor(GREY[1], GREY[2], GREY[3])
+        fVal:SetText("---"); fVal:SetTextColor(GREY[1], GREY[2], GREY[3])
     end
 
-    -- COOLDOWNS
-    for _, f in ipairs(cdFrames) do
-        local key   = f.groupKey
-        local cache = spellCache[key]
-        if not cache then
-            SetColor(f.border, C.grey_dim, 0.4)
-            SetColor(f.inner, {0.07,0.05,0.03}, 1)
-            f.timer:SetText(f.learnLevel)
-            f.timer:SetTextColor(C.grey_dim[1],C.grey_dim[2],C.grey_dim[3])
-            f.lbl:SetTextColor(C.grey_dim[1],C.grey_dim[2],C.grey_dim[3])
+    -- Demo Roar
+    if UnitExists("target") then
+        local r = DebuffOnTarget(DR_IDS)
+        if r then
+            dDot:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
+            local t = r >= 999 and "∞" or string.format("%ds", math.floor(r))
+            dVal:SetText(t)
+            dVal:SetTextColor(r < 3 and ORANGE[1] or GREEN[1], r < 3 and ORANGE[2] or GREEN[2], r < 3 and ORANGE[3] or GREEN[3])
         else
-            f.lbl:SetTextColor(C.gold_dim[1],C.gold_dim[2],C.gold_dim[3])
-            local cd = GetGroupCD(key) or 0
-            if cd<=0 then
-                SetColor(f.border, C.gold, 1)
-                SetColor(f.inner, {0.05,0.15,0.05}, 1)
+            dDot:SetTextColor(REDBR[1], REDBR[2], REDBR[3])
+            dVal:SetText("!")
+            dVal:SetTextColor(REDBR[1], REDBR[2], REDBR[3])
+        end
+    else
+        dDot:SetTextColor(GREY[1], GREY[2], GREY[3])
+        dVal:SetText("---"); dVal:SetTextColor(GREY[1], GREY[2], GREY[3])
+    end
+
+    -- Cooldowns
+    for _, f in ipairs(cdSlots) do
+        local c = cache[f.key]
+        if not c then
+            f.border:SetColorTexture(DGOLD[1]*0.4, DGOLD[2]*0.4, DGOLD[3]*0.4, 0.3)
+            f.inner:SetColorTexture(0.07, 0.05, 0.03, 1)
+            f.timer:SetText(f.minLevel)
+            f.timer:SetTextColor(GREY[1]*0.6, GREY[2]*0.6, GREY[3]*0.6)
+            f.lbl:SetTextColor(GREY[1]*0.5, GREY[2]*0.5, GREY[3]*0.5)
+        else
+            f.lbl:SetTextColor(DGOLD[1], DGOLD[2], DGOLD[3])
+            local cd = GetCD(f.key) or 0
+            if cd <= 0 then
+                f.border:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.9)
+                f.inner:SetColorTexture(0.04, 0.14, 0.04, 1)
                 f.timer:SetText("✓")
-                f.timer:SetTextColor(C.green[1],C.green[2],C.green[3])
-            elseif cd<5 then
-                SetColor(f.border, C.orange, 0.9)
-                SetColor(f.inner, {0.20,0.10,0.00}, 1)
-                f.timer:SetText(string.format("%.1f",cd))
-                f.timer:SetTextColor(C.orange[1],C.orange[2],C.orange[3])
+                f.timer:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
+            elseif cd < 5 then
+                f.border:SetColorTexture(ORANGE[1], ORANGE[2], ORANGE[3], 0.9)
+                f.inner:SetColorTexture(0.18, 0.09, 0, 1)
+                f.timer:SetText(string.format("%.1f", cd))
+                f.timer:SetTextColor(ORANGE[1], ORANGE[2], ORANGE[3])
             else
-                SetColor(f.border, C.gold_dim, 0.6)
-                SetColor(f.inner, C.bg_dark, 1)
-                f.timer:SetText(string.format("%d",math.ceil(cd)))
-                f.timer:SetTextColor(C.grey[1],C.grey[2],C.grey[3])
+                f.border:SetColorTexture(DGOLD[1], DGOLD[2], DGOLD[3], 0.5)
+                f.inner:SetColorTexture(DKGREY[1], DKGREY[2], DKGREY[3], 1)
+                f.timer:SetText(math.ceil(cd))
+                f.timer:SetTextColor(GREY[1], GREY[2], GREY[3])
             end
         end
     end
@@ -801,29 +674,32 @@ end)
 SLASH_GH1, SLASH_GH2 = "/gh", "/guardianhelper"
 SlashCmdList["GH"] = function(msg)
     msg = strtrim(msg:lower())
-    if msg=="lock" then
-        GuardianHelperDB.locked = not GuardianHelperDB.locked
-        print("|cffC8A84BGuardianHelper:|r " .. (GuardianHelperDB.locked and "Gesperrt." or "Entsperrt."))
-    elseif msg=="hide"   then Frame:Hide()
-    elseif msg=="show"   then Frame:Show()
-    elseif msg=="config" or msg=="cfg" then
-        if ConfigFrame:IsShown() then ConfigFrame:Hide() else ConfigFrame:Show() end
-    elseif msg=="reset"  then
-        Frame:ClearAllPoints(); Frame:SetPoint("CENTER",UIParent,"CENTER",350,0)
-        GuardianHelperDB.x,GuardianHelperDB.y=nil,nil
-    elseif msg=="update" then
-        RebuildSpellCache(); RebuildMaulIDs(); UpdateAllActionBars()
-        print("|cffC8A84BGuardianHelper:|r Aktionsleisten aktualisiert.")
-    elseif msg=="status" then
+    if msg == "lock" then
+        if DB then DB.locked = not DB.locked end
+        print("|cffC8A84BGuardianHelper:|r " .. (DB and DB.locked and "Gesperrt." or "Entsperrt."))
+    elseif msg == "hide"           then Frame:Hide()
+    elseif msg == "show"           then Frame:Show()
+    elseif msg == "config" or msg == "cfg" then
+        if CFG:IsShown() then CFG:Hide() else CFG:Show() end
+    elseif msg == "reset"          then
+        Frame:ClearAllPoints()
+        Frame:SetPoint("CENTER", UIParent, "CENTER", 350, 0)
+        if DB then DB.x, DB.y = nil, nil end
+    elseif msg == "update"         then
+        BuildCache()
+        print("|cffC8A84BGuardianHelper:|r Cache aktualisiert.")
+    elseif msg == "status"         then
         print("|cffC8A84BGuardianHelper — Spells:|r")
-        for k,g in pairs(SPELL_GROUPS) do
-            local c=spellCache[k]
-            if c then print("  "..g.label..": "..(GetSpellInfo(c.highestID) or "?").." (Lvl "..c.highestLevel..")")
-            else print("  |cff555555"..g.label..": ab Lvl "..g.ranks[1].level.."|r") end
+        for k, g in pairs(SPELL_GROUPS) do
+            local c = cache[k]
+            if c then
+                print("  " .. g.label .. ": " .. (GetSpellInfo(c.id) or "?") .. " (Lvl " .. c.lv .. ")")
+            else
+                print("  |cff555555" .. g.label .. ": ab Lvl " .. g.ranks[1].lv .. "|r")
+            end
         end
     else
-        print("|cffC8A84BGuardianHelper v"..GH_VERSION.."|r")
-        print("  /gh lock · hide · show · reset · update · status")
-        print("  /gh config  — Einstellungen öffnen")
+        print("|cffC8A84BGuardianHelper v" .. VERSION .. "|r")
+        print("  /gh lock · hide · show · reset · update · status · config")
     end
 end
