@@ -1,9 +1,17 @@
 ## Interface: 20504
 ## Title: |cff8B4513Guardian|r|cffffffffHelper|r
 ## Notes: Guardian Druid Tank Assistant — Level 1-70 (Classic & TBC)
-## Author: Claude & Micha
+## Notes-deDE: Baeren-Druide Tank Assistent — Level 1-70 (Classic & TBC)
+## Author: flexisticker
 ## Version: 2.0.0
 ## DefaultState: Enabled
+
+## X-Curse-Project-ID: 1567398
+## X-WoWI-ID:
+## X-GitHub: https://github.com/flexisticker/guardian-helper-wow
+## X-License: MIT
+## X-Category: Tank, Druid, Classic
+
 ## X-Classic-Version: 1.14.3
 ## X-TBC-Version: 2.5.4
 
