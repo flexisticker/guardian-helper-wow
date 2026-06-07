@@ -482,26 +482,30 @@ local cb6 = MakeCheckbox(ConfigFrame, "Status-Dots",        -122, "showStatusDot
 
 MakeSep(ConfigFrame, -136, 4)
 
--- Opacity Slider (fake, WoW-Style)
+-- Opacity Buttons (+ / - statt Slider, TBC-kompatibel)
 local opLbl = MakeFont(ConfigFrame, 7, "OUTLINE")
 opLbl:SetPoint("TOPLEFT", ConfigFrame, "TOPLEFT", 10, -142)
 opLbl:SetText("Opacity")
 opLbl:SetTextColor(C.gold_dim[1], C.gold_dim[2], C.gold_dim[3])
 
-local opSlider = CreateFrame("Slider", "GHOpacitySlider", ConfigFrame, "OptionsSliderTemplate")
-opSlider:SetSize(170, 14)
-opSlider:SetPoint("TOPLEFT", ConfigFrame, "TOPLEFT", 10, -158)
-opSlider:SetMinMaxValues(0.3, 1.0)
-opSlider:SetValue(GuardianHelperDB.alpha)
-opSlider:SetValueStep(0.05)
-_G[opSlider:GetName().."Low"]:SetText("30%")
-_G[opSlider:GetName().."High"]:SetText("100%")
-_G[opSlider:GetName().."Text"]:SetText(string.format("%.0f%%", GuardianHelperDB.alpha * 100))
-opSlider:SetScript("OnValueChanged", function(self, val)
-    GuardianHelperDB.alpha = val
-    Frame:SetAlpha(val)
-    _G[self:GetName().."Text"]:SetText(string.format("%.0f%%", val * 100))
+local opVal = MakeFont(ConfigFrame, 8, "OUTLINE")
+opVal:SetPoint("TOPLEFT", ConfigFrame, "TOPLEFT", 10, -155)
+opVal:SetText(string.format("%.0f%%", (GuardianHelperDB.alpha or 0.95) * 100))
+opVal:SetTextColor(C.white[1], C.white[2], C.white[3])
+
+local opMinus = MakeButton(ConfigFrame, 30, 14, "  −  ", function()
+    GuardianHelperDB.alpha = math.max(0.3, (GuardianHelperDB.alpha or 0.95) - 0.05)
+    Frame:SetAlpha(GuardianHelperDB.alpha)
+    opVal:SetText(string.format("%.0f%%", GuardianHelperDB.alpha * 100))
 end)
+opMinus:SetPoint("TOPLEFT", ConfigFrame, "TOPLEFT", 60, -151)
+
+local opPlus = MakeButton(ConfigFrame, 30, 14, "  +  ", function()
+    GuardianHelperDB.alpha = math.min(1.0, (GuardianHelperDB.alpha or 0.95) + 0.05)
+    Frame:SetAlpha(GuardianHelperDB.alpha)
+    opVal:SetText(string.format("%.0f%%", GuardianHelperDB.alpha * 100))
+end)
+opPlus:SetPoint("TOPLEFT", ConfigFrame, "TOPLEFT", 94, -151)
 
 MakeSep(ConfigFrame, -178, 4)
 

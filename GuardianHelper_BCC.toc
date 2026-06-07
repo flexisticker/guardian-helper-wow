@@ -9,5 +9,6 @@
 ## X-GitHub: https://github.com/flexisticker/guardian-helper-wow
 ## X-License: MIT
 ## IconTexture: Interface\AddOns\GuardianHelper\icon
+## SavedVariables: GuardianHelperDB
 
 GuardianHelper.lua
