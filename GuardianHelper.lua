@@ -1,23 +1,71 @@
 -- ============================================================
--- GuardianHelper v4.1 — Stable Core
+-- GuardianHelper v4.2 — Lokalisierung DE/EN
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.1.0"
+local VERSION = "4.2.0"
 
 -- SavedVariables werden nach ADDON_LOADED initialisiert
 local DB
 
 -- ============================================================
+-- LOKALISIERUNG (automatisch per GetLocale())
+-- ============================================================
+local LOCALE = GetLocale()  -- z.B. "deDE", "enUS", "enGB"
+local IS_DE  = (LOCALE == "deDE")
+
+-- Alle sichtbaren Texte im Addon
+local L = {
+    -- Header
+    BEAR_FORM      = IS_DE and ">> BAERENGESTALT"  or ">> BEAR FORM",
+    DIRE_BEAR      = IS_DE and ">> WILDE BAER"     or ">> DIRE BEAR",
+    NO_BEAR        = IS_DE and "!! KEINE BAERENFORM" or "!! NO BEAR FORM",
+    -- Maul
+    MAUL_READY     = IS_DE and ">> KRALLENHIEB BEREIT" or ">> MAUL READY",
+    MAUL_INACTIVE  = IS_DE and "-- Krallenhieb inaktiv" or "-- Maul not active",
+    -- Cooldown Labels
+    CD_BASH        = IS_DE and "Hieb"    or "Bash",
+    CD_GROWL       = IS_DE and "Knurr."  or "Growl",
+    CD_ENRAGE      = IS_DE and "Rasen"   or "Enrage",
+    CD_FREG        = IS_DE and "F.Reg"   or "F.Reg",
+    CD_BARK        = IS_DE and "Borke"   or "Bark",
+    CD_MANGLE      = IS_DE and "Zerr."   or "Mangle",
+    CD_LACERATE    = IS_DE and "Aufr."   or "Lacerate",
+    -- Debuffs
+    FF_LABEL       = IS_DE and "FEF"     or "FF",
+    DR_LABEL       = IS_DE and "Demo"    or "DR",
+    -- Status
+    READY          = IS_DE and "OK"      or "RDY",
+    -- Footer
+    FOOTER         = "/gh lock  .  /gh help  .  /gh config",
+    -- Config
+    CFG_TITLE      = IS_DE and "[ GuardianHelper Konfig ]" or "[ GuardianHelper Config ]",
+    CFG_MAUL       = IS_DE and "Krallenhieb-Alert"   or "Maul Queue Alert",
+    CFG_SOUND      = IS_DE and "Sound bei Formverlust" or "Sound on Form Loss",
+    CFG_COMBAT     = IS_DE and "Nur im Kampf zeigen"  or "Show in Combat only",
+    CFG_RAGE       = IS_DE and "Wut-Leiste anzeigen"  or "Show Rage Bar",
+    CFG_CDTEXT     = IS_DE and "Cooldown-Text"         or "Cooldown Text",
+    CFG_DOTS       = IS_DE and "Status-Punkte"         or "Status Dots",
+    CFG_SAVE       = IS_DE and "Speichern"             or "Save",
+    CFG_CANCEL     = IS_DE and "Abbrechen"             or "Cancel",
+    -- Chat
+    MSG_LOADED     = IS_DE and "bereit" or "ready",
+    MSG_LOCKED     = IS_DE and "Gesperrt."    or "Locked.",
+    MSG_UNLOCKED   = IS_DE and "Entsperrt."   or "Unlocked.",
+    MSG_SAVED      = IS_DE and "Gespeichert." or "Saved.",
+    MSG_UPDATED    = IS_DE and "Cache aktualisiert." or "Cache updated.",
+}
+
+-- ============================================================
 -- SPELL DATEN
 -- ============================================================
 local SPELL_GROUPS = {
-    BASH           = { label="Bash",   ranks={{id=5211,lv=14},{id=6798,lv=22},{id=8983,lv=32},{id=25515,lv=42}} },
-    GROWL          = { label="Growl",  ranks={{id=6795,lv=10}} },
-    ENRAGE         = { label="Enrg",   ranks={{id=5229,lv=14}} },
-    FRENZIED_REGEN = { label="F.Reg",  ranks={{id=22842,lv=36},{id=22895,lv=46},{id=22896,lv=56},{id=26999,lv=66}} },
-    BARKSKIN       = { label="Bark",   ranks={{id=22812,lv=44}} },
-    MANGLE_BEAR    = { label="Mngl",   ranks={{id=33878,lv=60},{id=33986,lv=66}} },
-    LACERATE       = { label="Lac.",   ranks={{id=33745,lv=66}} },
+    BASH           = { label=L.CD_BASH,   ranks={{id=5211,lv=14},{id=6798,lv=22},{id=8983,lv=32},{id=25515,lv=42}} },
+    GROWL          = { label=L.CD_GROWL,  ranks={{id=6795,lv=10}} },
+    ENRAGE         = { label=L.CD_ENRAGE, ranks={{id=5229,lv=14}} },
+    FRENZIED_REGEN = { label=L.CD_FREG,   ranks={{id=22842,lv=36},{id=22895,lv=46},{id=22896,lv=56},{id=26999,lv=66}} },
+    BARKSKIN       = { label=L.CD_BARK,   ranks={{id=22812,lv=44}} },
+    MANGLE_BEAR    = { label=L.CD_MANGLE, ranks={{id=33878,lv=60},{id=33986,lv=66}} },
+    LACERATE       = { label=L.CD_LACERATE, ranks={{id=33745,lv=66}} },
 }
 local CD_ORDER  = { "BASH","GROWL","ENRAGE","FRENZIED_REGEN","BARKSKIN","MANGLE_BEAR","LACERATE" }
 local MAUL_IDS  = {[6807]=true,[8972]=true,[9745]=true,[9880]=true,[9881]=true,[26996]=true,[26997]=true}
@@ -28,17 +76,17 @@ local DR_IDS    = {99,1735,9490,9747,9898,26998}
 -- ============================================================
 -- FARBEN
 -- ============================================================
-local GOLD   = {0.784, 0.659, 0.294}
-local DGOLD  = {0.350, 0.290, 0.110}
-local BG1    = {0.110, 0.082, 0.063, 0.96}
-local BG2    = {0.160, 0.118, 0.059, 1.00}
-local RED    = {0.800, 0.100, 0.040}
-local REDBR  = {1.000, 0.200, 0.050}
-local GREEN  = {0.100, 0.850, 0.250}
-local ORANGE = {1.000, 0.549, 0.000}
-local WHITE  = {0.940, 0.910, 0.820}
-local GREY   = {0.420, 0.370, 0.300}
-local DKGREY = {0.180, 0.150, 0.110}
+local GOLD   = {1.000, 0.820, 0.000}
+local DGOLD  = {0.800, 0.620, 0.100}
+local BG1    = {0.050, 0.037, 0.028, 0.97}
+local BG2    = {0.090, 0.068, 0.035, 1.00}
+local RED    = {0.900, 0.120, 0.040}
+local REDBR  = {1.000, 0.250, 0.060}
+local GREEN  = {0.200, 1.000, 0.350}
+local ORANGE = {1.000, 0.620, 0.050}
+local WHITE  = {1.000, 1.000, 1.000}
+local GREY   = {0.720, 0.660, 0.560}
+local DKGREY = {0.100, 0.078, 0.055}
 
 -- ============================================================
 -- HILFSFUNKTIONEN
@@ -111,11 +159,11 @@ hLine:SetPoint("TOPLEFT", Frame, "TOPLEFT", 1, -1)
 -- Header Texte
 local hTitle = CF(Frame, 9, GOLD[1], GOLD[2], GOLD[3])
 hTitle:SetPoint("LEFT", Frame, "TOPLEFT", 8, -10)
-hTitle:SetText("🐻  GUARDIAN")
+hTitle:SetText(L.BEAR_FORM)
 
 local hDot = CF(Frame, 8, GREEN[1], GREEN[2], GREEN[3])
 hDot:SetPoint("RIGHT", Frame, "TOPRIGHT", -6, -10)
-hDot:SetText("●")
+hDot:SetText("[o]")
 
 Sep(Frame, -19)
 
@@ -161,11 +209,11 @@ mBG:SetPoint("TOPRIGHT", Frame, "TOPRIGHT", -1, -48)
 
 local mDot = CF(Frame, 7, GREY[1], GREY[2], GREY[3])
 mDot:SetPoint("LEFT", Frame, "TOPLEFT", 7, -56)
-mDot:SetText("▪")
+mDot:SetText("-")
 
 local mTxt = CF(Frame, 8, GREY[1], GREY[2], GREY[3])
 mTxt:SetPoint("LEFT", Frame, "TOPLEFT", 16, -56)
-mTxt:SetText("Maul — nicht aktiv")
+mTxt:SetText(L.MAUL_INACTIVE)
 
 Sep(Frame, -64)
 
@@ -174,11 +222,11 @@ Sep(Frame, -64)
 -- ============================================================
 local fDot = CF(Frame, 7, GREY[1], GREY[2], GREY[3])
 fDot:SetPoint("TOPLEFT", Frame, "TOPLEFT", 7, -72)
-fDot:SetText("●")
+fDot:SetText("[*]")
 
 local fLbl = CF(Frame, 7, DGOLD[1], DGOLD[2], DGOLD[3])
 fLbl:SetPoint("TOPLEFT", Frame, "TOPLEFT", 16, -72)
-fLbl:SetText("FF")
+fLbl:SetText(L.FF_LABEL)
 
 local fVal = CF(Frame, 8, GREY[1], GREY[2], GREY[3])
 fVal:SetPoint("TOPLEFT", Frame, "TOPLEFT", 30, -72)
@@ -190,11 +238,11 @@ vSep:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2, -68)
 
 local dDot = CF(Frame, 7, GREY[1], GREY[2], GREY[3])
 dDot:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2+5, -72)
-dDot:SetText("●")
+dDot:SetText("[*]")
 
 local dLbl = CF(Frame, 7, DGOLD[1], DGOLD[2], DGOLD[3])
 dLbl:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2+14, -72)
-dLbl:SetText("DR")
+dLbl:SetText(L.DR_LABEL)
 
 local dVal = CF(Frame, 8, GREY[1], GREY[2], GREY[3])
 dVal:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2+28, -72)
@@ -245,7 +293,7 @@ end
 -- Footer
 local footer = CF(Frame, 6, 0.22, 0.18, 0.14)
 footer:SetPoint("BOTTOM", Frame, "BOTTOM", 0, 3)
-footer:SetText("/gh lock  ·  /gh help  ·  /gh config")
+footer:SetText(L.FOOTER)
 
 -- Frame Höhe final
 Frame:SetHeight(82 + CD_SZ + 9 + 8)
@@ -269,7 +317,7 @@ local mmIcon = CF(MM, 11, 1, 1, 1)
 mmIcon:SetAllPoints()
 mmIcon:SetJustifyH("CENTER")
 mmIcon:SetJustifyV("MIDDLE")
-mmIcon:SetText("🐻")
+mmIcon:SetText("GH")
 
 local mmAngle = 220
 local function SetMMPos()
@@ -329,13 +377,13 @@ cfgHdr:SetPoint("TOPRIGHT", CFG, "TOPRIGHT", -1, -1)
 
 local cfgTitle = CF(CFG, 9, GOLD[1], GOLD[2], GOLD[3])
 cfgTitle:SetPoint("CENTER", CFG, "TOP", 0, -10)
-cfgTitle:SetText("⚙  GuardianHelper Config")
+cfgTitle:SetText(L.CFG_TITLE)
 
 local cfgX = CreateFrame("Button", nil, CFG)
 cfgX:SetSize(16, 16)
 cfgX:SetPoint("TOPRIGHT", CFG, "TOPRIGHT", -4, -2)
 local cfgXL = CF(cfgX, 10, GOLD[1], GOLD[2], GOLD[3])
-cfgXL:SetAllPoints(); cfgXL:SetJustifyH("CENTER"); cfgXL:SetText("✕")
+cfgXL:SetAllPoints(); cfgXL:SetJustifyH("CENTER"); cfgXL:SetText("X")
 cfgX:SetScript("OnClick", function() CFG:Hide() end)
 
 Sep(CFG, -19)
@@ -355,7 +403,7 @@ local function AddCheck(label, key, yOff)
     check:SetSize(10, 10)
     check:SetPoint("LEFT", btn, "LEFT", 1, 0)
     check:SetJustifyH("CENTER")
-    check:SetText(DB and DB[key] and "✓" or "")
+    check:SetText(DB and DB[key] and "OK" or "")
     btn.check = check
 
     local lbl = CF(btn, 8, WHITE[1], WHITE[2], WHITE[3])
@@ -365,7 +413,7 @@ local function AddCheck(label, key, yOff)
     btn:SetScript("OnClick", function()
         if DB then
             DB[key] = not DB[key]
-            check:SetText(DB[key] and "✓" or "")
+            check:SetText(DB[key] and "OK" or "")
         end
     end)
     cfgChecks[key] = btn
@@ -413,14 +461,14 @@ end)
 
 Sep(CFG, -100)
 
-local btnSave = MakeBtn("Speichern", 15, -108, function()
-    print("|cffC8A84BGuardianHelper:|r Gespeichert.")
+local btnSave = MakeBtn(L.CFG_SAVE, 15, -108, function()
+    print("|cffC8A84BGuardianHelper:|r " .. L.MSG_SAVED)
     CFG:Hide()
 end)
 btnSave:SetSize(80, 18)
 btnSave:SetPoint("BOTTOMLEFT", CFG, "BOTTOMLEFT", 8, 6)
 
-local btnCancel = MakeBtn("Abbrechen", 110, -108, function() CFG:Hide() end)
+local btnCancel = MakeBtn(L.CFG_CANCEL, 110, -108, function() CFG:Hide() end)
 btnCancel:SetSize(80, 18)
 btnCancel:SetPoint("BOTTOMRIGHT", CFG, "BOTTOMRIGHT", -8, 6)
 
@@ -525,7 +573,7 @@ EF:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "PLAYER_LOGIN" then
         BuildCache()
-        print("|cffC8A84BGuardianHelper|r v"..VERSION.." bereit  🐻  |cffaaaaaa/gh help|r")
+        print("|cffC8A84BGuardianHelper|r v"..VERSION.." "..L.MSG_LOADED.."  |cffaaaaaa/gh help|r")
 
     elseif event == "PLAYER_LEVEL_UP" then
         local df = CreateFrame("Frame"); local el = 0
@@ -576,14 +624,14 @@ Frame:SetScript("OnUpdate", function(self, dt)
     if inBear then
         hLine:SetColorTexture(GREEN[1], GREEN[2], GREEN[3], 1)
         hDot:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
-        hDot:SetText("●")
-        hTitle:SetText(isDire and "🐻  DIRE BEAR" or "🐻  BEAR FORM")
+        hDot:SetText("[o]")
+        hTitle:SetText(isDire and L.DIRE_BEAR or L.BEAR_FORM)
         hTitle:SetTextColor(GOLD[1], GOLD[2], GOLD[3])
     else
         hLine:SetColorTexture(REDBR[1], REDBR[2], REDBR[3], 1)
         hDot:SetTextColor(REDBR[1], REDBR[2], REDBR[3])
-        hDot:SetText("⚠")
-        hTitle:SetText("  KEINE BÄRENFORM")
+        hDot:SetText("[!]")
+        hTitle:SetText(L.NO_BEAR)
         hTitle:SetTextColor(REDBR[1], REDBR[2], REDBR[3])
     end
 
@@ -591,12 +639,12 @@ Frame:SetScript("OnUpdate", function(self, dt)
     if maulQueued then
         mBG:SetColorTexture(0.18, 0.09, 0, 1)
         mDot:SetTextColor(ORANGE[1], ORANGE[2], ORANGE[3])
-        mTxt:SetText("⚔  MAUL READY")
+        mTxt:SetText(L.MAUL_READY)
         mTxt:SetTextColor(ORANGE[1], ORANGE[2], ORANGE[3])
     else
         mBG:SetColorTexture(DKGREY[1], DKGREY[2], DKGREY[3], 1)
         mDot:SetTextColor(GREY[1], GREY[2], GREY[3])
-        mTxt:SetText("Maul — nicht aktiv")
+        mTxt:SetText(L.MAUL_INACTIVE)
         mTxt:SetTextColor(GREY[1], GREY[2], GREY[3])
     end
 
@@ -651,7 +699,7 @@ Frame:SetScript("OnUpdate", function(self, dt)
             if cd <= 0 then
                 f.border:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.9)
                 f.inner:SetColorTexture(0.04, 0.14, 0.04, 1)
-                f.timer:SetText("✓")
+                f.timer:SetText("RDY")
                 f.timer:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
             elseif cd < 5 then
                 f.border:SetColorTexture(ORANGE[1], ORANGE[2], ORANGE[3], 0.9)
@@ -676,7 +724,7 @@ SlashCmdList["GH"] = function(msg)
     msg = strtrim(msg:lower())
     if msg == "lock" then
         if DB then DB.locked = not DB.locked end
-        print("|cffC8A84BGuardianHelper:|r " .. (DB and DB.locked and "Gesperrt." or "Entsperrt."))
+        print("|cffC8A84BGuardianHelper:|r " .. (DB and DB.locked and L.MSG_LOCKED or L.MSG_UNLOCKED))
     elseif msg == "hide"           then Frame:Hide()
     elseif msg == "show"           then Frame:Show()
     elseif msg == "config" or msg == "cfg" then
@@ -687,7 +735,7 @@ SlashCmdList["GH"] = function(msg)
         if DB then DB.x, DB.y = nil, nil end
     elseif msg == "update"         then
         BuildCache()
-        print("|cffC8A84BGuardianHelper:|r Cache aktualisiert.")
+        print("|cffC8A84BGuardianHelper:|r " .. L.MSG_UPDATED)
     elseif msg == "status"         then
         print("|cffC8A84BGuardianHelper — Spells:|r")
         for k, g in pairs(SPELL_GROUPS) do
