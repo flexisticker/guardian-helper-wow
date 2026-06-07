@@ -1,0 +1,10 @@
+package-as: GuardianHelper
+
+ignore:
+  - .pkgmeta
+  - .gitignore
+  - .github
+  - CONTRIBUTING.md
+  - CHANGELOG.md
+  - README.md
+  - LICENSE

@@ -1,0 +1,35 @@
+name: Release & CurseForge Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Build & Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: GuardianHelper ${{ github.ref_name }}
+          body_path: CHANGELOG.md
+          files: |
+            GuardianHelper.lua
+            GuardianHelper.toc
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # CurseForge Upload — benoetigt:
+      # 1. Secret CF_API_KEY in GitHub Repo Settings hinzufuegen
+      # 2. X-Curse-Project-ID in GuardianHelper.toc eintragen
+      - name: Publish to CurseForge
+        uses: BigWigsMods/packager@v2
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: -g classic:tbc
