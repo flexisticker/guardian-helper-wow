@@ -266,20 +266,31 @@ for i, key in ipairs(CD_ORDER) do
     cf:SetSize(CD_SZ, CD_SZ + 9)
     cf:SetPoint("TOPLEFT", Frame, "TOPLEFT", xp, -82)
 
-    local cborder = CT(cf, "BACKGROUND", DGOLD[1], DGOLD[2], DGOLD[3], 0.5)
+    -- Gold Rahmen
+    local cborder = CT(cf, "BACKGROUND", DGOLD[1], DGOLD[2], DGOLD[3], 0.6)
     cborder:SetAllPoints()
     cf.border = cborder
 
-    local cinner = CT(cf, "BORDER", DKGREY[1], DKGREY[2], DKGREY[3], 1)
-    cinner:SetPoint("TOPLEFT",     cf, "TOPLEFT",      1, -1)
-    cinner:SetPoint("BOTTOMRIGHT", cf, "BOTTOMRIGHT",  -1, 8)
-    cf.inner = cinner
+    -- Spell Icon (wird beim Cache-Build gesetzt)
+    local cicon = cf:CreateTexture(nil, "BORDER")
+    cicon:SetPoint("TOPLEFT",     cf, "TOPLEFT",      1, -1)
+    cicon:SetPoint("BOTTOMRIGHT", cf, "BOTTOMRIGHT",  -1, 8)
+    cicon:SetColorTexture(DKGREY[1], DKGREY[2], DKGREY[3], 1)
+    cf.icon = cicon
 
-    local ctimer = CF(cf, 9, GREY[1], GREY[2], GREY[3])
+    -- Dunkles Overlay für CD (halbtransparent über dem Icon)
+    local coverlay = CT(cf, "ARTWORK", 0, 0, 0, 0)
+    coverlay:SetPoint("TOPLEFT",     cf, "TOPLEFT",      1, -1)
+    coverlay:SetPoint("BOTTOMRIGHT", cf, "BOTTOMRIGHT",  -1, 8)
+    cf.overlay = coverlay
+
+    -- Timer Text
+    local ctimer = CF(cf, 8, WHITE[1], WHITE[2], WHITE[3])
     ctimer:SetPoint("CENTER", cf, "CENTER", 0, 4)
-    ctimer:SetText("?")
+    ctimer:SetText("")
     cf.timer = ctimer
 
+    -- Label unter dem Icon
     local clbl = CF(cf, 6, DGOLD[1], DGOLD[2], DGOLD[3])
     clbl:SetPoint("BOTTOM", cf, "BOTTOM", 0, 1)
     clbl:SetText(SPELL_GROUPS[key].label)
@@ -287,6 +298,7 @@ for i, key in ipairs(CD_ORDER) do
 
     cf.key      = key
     cf.minLevel = SPELL_GROUPS[key].ranks[1].lv
+    cf.iconSet  = false
     cdSlots[i]  = cf
 end
 
@@ -300,24 +312,41 @@ Frame:SetHeight(82 + CD_SZ + 9 + 8)
 
 -- ============================================================
 -- MINIMAP BUTTON
+-- Eltern: UIParent (nicht Minimap) damit hover-hide Problem vermieden wird
 -- ============================================================
-local MM = CreateFrame("Button", "GHMinimapButton", Minimap)
-MM:SetSize(24, 24)
+local MM = CreateFrame("Button", "GHMinimapButton", UIParent)
+MM:SetSize(28, 28)
 MM:SetFrameStrata("MEDIUM")
-MM:SetFrameLevel(8)
+MM:SetFrameLevel(Minimap:GetFrameLevel() + 20)  -- immer über Minimap
 MM:SetMovable(true)
 MM:RegisterForDrag("LeftButton")
+MM:EnableMouse(true)
 
+-- Runder Gold-Rahmen
 local mmRing = CT(MM, "BACKGROUND", GOLD[1], GOLD[2], GOLD[3], 1)
 mmRing:SetAllPoints()
-local mmBG   = CT(MM, "BORDER", BG1[1], BG1[2], BG1[3], 1)
+
+-- Dunkler Innenbereich
+local mmBG = CT(MM, "BORDER", BG1[1], BG1[2], BG1[3], 1)
 mmBG:SetPoint("TOPLEFT",     MM, "TOPLEFT",      2, -2)
 mmBG:SetPoint("BOTTOMRIGHT", MM, "BOTTOMRIGHT",  -2,  2)
-local mmIcon = CF(MM, 11, 1, 1, 1)
-mmIcon:SetAllPoints()
-mmIcon:SetJustifyH("CENTER")
-mmIcon:SetJustifyV("MIDDLE")
-mmIcon:SetText("GH")
+
+-- Bear Form Icon als Ingame-Textur
+local mmTexture = MM:CreateTexture(nil, "ARTWORK")
+mmTexture:SetPoint("TOPLEFT",     MM, "TOPLEFT",      3, -3)
+mmTexture:SetPoint("BOTTOMRIGHT", MM, "BOTTOMRIGHT",  -3,  3)
+-- Bärengestalt Icon (Bear Form Spell ID 5487)
+local bearIconTex = GetSpellTexture(5487) or GetSpellTexture(9634)
+if bearIconTex then
+    mmTexture:SetTexture(bearIconTex)
+else
+    -- Fallback: Text
+    local mmFallback = CF(MM, 9, GOLD[1], GOLD[2], GOLD[3])
+    mmFallback:SetAllPoints()
+    mmFallback:SetJustifyH("CENTER")
+    mmFallback:SetJustifyV("MIDDLE")
+    mmFallback:SetText("GH")
+end
 
 local mmAngle = 220
 local function SetMMPos()
@@ -490,7 +519,7 @@ local function BuildCache()
                     if rd.id == sid then
                         local c = cache[key]
                         if not c or rd.lv > c.lv then
-                            cache[key] = {id=sid, lv=rd.lv, slot=i}
+                            cache[key] = {id=sid, lv=rd.lv, slot=i, icon=GetSpellTexture(sid)}
                         end
                     end
                 end
@@ -688,29 +717,39 @@ Frame:SetScript("OnUpdate", function(self, dt)
     for _, f in ipairs(cdSlots) do
         local c = cache[f.key]
         if not c then
-            f.border:SetColorTexture(DGOLD[1]*0.4, DGOLD[2]*0.4, DGOLD[3]*0.4, 0.3)
-            f.inner:SetColorTexture(0.07, 0.05, 0.03, 1)
+            -- Noch nicht gelernt: gedimmtes Icon oder dunkler BG
+            f.border:SetColorTexture(DGOLD[1]*0.3, DGOLD[2]*0.3, DGOLD[3]*0.3, 0.4)
+            f.icon:SetColorTexture(0.06, 0.04, 0.03, 1)
+            f.overlay:SetColorTexture(0, 0, 0, 0)
             f.timer:SetText(f.minLevel)
-            f.timer:SetTextColor(GREY[1]*0.6, GREY[2]*0.6, GREY[3]*0.6)
-            f.lbl:SetTextColor(GREY[1]*0.5, GREY[2]*0.5, GREY[3]*0.5)
+            f.timer:SetTextColor(GREY[1]*0.5, GREY[2]*0.5, GREY[3]*0.5)
+            f.lbl:SetTextColor(GREY[1]*0.4, GREY[2]*0.4, GREY[3]*0.4)
         else
+            -- Icon setzen (einmalig)
+            if not f.iconSet and c.icon then
+                f.icon:SetTexture(c.icon)
+                f.iconSet = true
+            end
             f.lbl:SetTextColor(DGOLD[1], DGOLD[2], DGOLD[3])
             local cd = GetCD(f.key) or 0
             if cd <= 0 then
-                f.border:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.9)
-                f.inner:SetColorTexture(0.04, 0.14, 0.04, 1)
-                f.timer:SetText("RDY")
+                -- Bereit: heller Goldrahmen, kein Overlay
+                f.border:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 1)
+                f.overlay:SetColorTexture(0, 0, 0, 0)
+                f.timer:SetText(L.READY)
                 f.timer:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
             elseif cd < 5 then
+                -- Fast bereit: Orange, leichtes Overlay
                 f.border:SetColorTexture(ORANGE[1], ORANGE[2], ORANGE[3], 0.9)
-                f.inner:SetColorTexture(0.18, 0.09, 0, 1)
+                f.overlay:SetColorTexture(0, 0, 0, 0.35)
                 f.timer:SetText(string.format("%.1f", cd))
                 f.timer:SetTextColor(ORANGE[1], ORANGE[2], ORANGE[3])
             else
-                f.border:SetColorTexture(DGOLD[1], DGOLD[2], DGOLD[3], 0.5)
-                f.inner:SetColorTexture(DKGREY[1], DKGREY[2], DKGREY[3], 1)
+                -- Auf CD: dunkles Overlay über Icon
+                f.border:SetColorTexture(DGOLD[1]*0.5, DGOLD[2]*0.5, DGOLD[3]*0.5, 0.6)
+                f.overlay:SetColorTexture(0, 0, 0, 0.65)
                 f.timer:SetText(math.ceil(cd))
-                f.timer:SetTextColor(GREY[1], GREY[2], GREY[3])
+                f.timer:SetTextColor(WHITE[1], WHITE[2], WHITE[3])
             end
         end
     end
