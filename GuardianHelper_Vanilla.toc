@@ -1,7 +1,7 @@
-## Interface: 20505
+## Interface: 11508
 ## Title: |cff8B4513Guardian|r|cffffffffHelper|r
-## Notes: Guardian Druid Tank Assistant — Level 1-70
-## Notes-deDE: Baeren-Druide Tank Assistent — Level 1-70
+## Notes: Guardian Druid Tank Assistant — Classic Era & Hardcore
+## Notes-deDE: Baeren-Druide Tank Assistent — Classic Era & Hardcore
 ## Author: flexisticker
 ## Version: 2.1.0
 ## DefaultState: Enabled

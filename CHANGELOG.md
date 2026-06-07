@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.0] - 2026-06-07
+
+### Neu
+- Multi-Version Support: Classic Era, TBC Classic & Anniversary Edition
+- Separate TOC-Dateien: `_Vanilla.toc` (Classic Era 1.15.x) und `_BCC.toc` (TBC 2.5.5)
+- Interface-Nummer korrigiert auf 20505 für TBC Anniversary
+
+---
+
 ## [2.0.0] - 2026-06-07
 
 ### Neu

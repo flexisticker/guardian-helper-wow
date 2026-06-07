@@ -1,7 +1,7 @@
 ## Interface: 20505
 ## Title: |cff8B4513Guardian|r|cffffffffHelper|r
-## Notes: Guardian Druid Tank Assistant — Level 1-70
-## Notes-deDE: Baeren-Druide Tank Assistent — Level 1-70
+## Notes: Guardian Druid Tank Assistant — TBC Classic & Anniversary Edition
+## Notes-deDE: Baeren-Druide Tank Assistent — TBC Classic & Anniversary
 ## Author: flexisticker
 ## Version: 2.1.0
 ## DefaultState: Enabled
