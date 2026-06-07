@@ -262,12 +262,13 @@ local cdX0   = math.floor((W - totW) / 2)
 local cdSlots = {}
 for i, key in ipairs(CD_ORDER) do
     local xp = cdX0 + (i-1) * (CD_SZ + CD_GAP)
-    -- Button statt Frame: erlaubt OnClick + EnableMouse
-    local cf = CreateFrame("Button", "GHSlot"..i, Frame)
+    -- SecureActionButtonTemplate: sicher in/ausserhalb Kampf, kein Taint
+    local cf = CreateFrame("Button", "GHSlot"..i, Frame, "SecureActionButtonTemplate")
     cf:SetSize(CD_SZ, CD_SZ + 9)
     cf:SetPoint("TOPLEFT", Frame, "TOPLEFT", xp, -82)
-    cf:EnableMouse(true)
-    cf:RegisterForClicks("LeftButtonUp")
+    cf:RegisterForClicks("AnyUp")
+    cf:SetAttribute("type1", "spell")
+    cf:SetAttribute("spell", "")  -- wird bei PLAYER_LOGIN gesetzt
 
     -- Gold Rahmen
     local cborder = CT(cf, "BACKGROUND", DGOLD[1], DGOLD[2], DGOLD[3], 0.6)
@@ -299,26 +300,20 @@ for i, key in ipairs(CD_ORDER) do
     clbl:SetText(SPELL_GROUPS[key].label)
     cf.lbl = clbl
 
-    -- Click-to-Cast: nur außerhalb Kampf erlaubt (kein Taint)
-    cf:SetScript("OnClick", function(self)
-        if not self.spellName then return end
-        if InCombatLockdown() then return end  -- im Kampf: nichts tun, Taste verwenden
-        CastSpellByName(self.spellName)
-    end)
-
-    -- Tooltip
+    -- Tooltip: Spellname + aktuelle WoW-Tastenbelegung
     cf:SetScript("OnEnter", function(self)
         if self.spellName then
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:SetText(self.spellName, 1, 1, 1)
-            local bind = DB and DB.bindings and DB.bindings[self.key]
-            if bind and bind ~= "" then
+            -- Zeige aktuelle Tastenbelegung aus WoW (GetBindingKey)
+            local bind = GetBindingKey("CLICK GHSlot"..self.slotIdx..":LeftButton")
+            if bind then
                 GameTooltip:AddLine((IS_DE and "Taste: " or "Key: ")..
                     "|cffFFD700"..bind.."|r", 1, 1, 1)
-            end
-            if not self.spellName then
-                GameTooltip:AddLine((IS_DE and "Ab Lvl " or "From lvl ")..
-                    self.minLevel, 0.6, 0.6, 0.6)
+            else
+                GameTooltip:AddLine(IS_DE and
+                    "|cff888888ESC -> Tasten -> Addon|r" or
+                    "|cff888888ESC -> Bindings -> AddOn|r", 1, 1, 1)
             end
             GameTooltip:Show()
         end
@@ -326,6 +321,7 @@ for i, key in ipairs(CD_ORDER) do
     cf:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     cf.key      = key
+    cf.slotIdx  = i
     cf.minLevel = SPELL_GROUPS[key].ranks[1].lv
     cf.iconSet  = false
     cf.spellName = nil
@@ -520,126 +516,31 @@ end)
 
 Sep(CFG, -100)
 
--- ===== TASTENBELEGUNG =====
-local bindLbl = CF(CFG, 7, DGOLD[1], DGOLD[2], DGOLD[3])
-bindLbl:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -108)
-bindLbl:SetText(IS_DE and "TASTENBELEGUNG" or "KEY BINDINGS")
+-- Keybinding Hinweis
+local bindHint = CF(CFG, 7, DGOLD[1], DGOLD[2], DGOLD[3])
+bindHint:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -108)
+bindHint:SetText(IS_DE and "TASTENBELEGUNG" or "KEY BINDINGS")
 
--- Key-Listener (wartet auf Tastendruck)
-local GHKeyListener = CreateFrame("Frame", "GHKeyListenerFrame", UIParent)
-GHKeyListener:EnableKeyboard(false)
-GHKeyListener:SetFrameStrata("DIALOG")
-GHKeyListener.waitBtn = nil
-GHKeyListener:SetScript("OnKeyDown", function(self, key)
-    if not self.waitBtn then return end
-    if key == "LSHIFT" or key == "RSHIFT" or
-       key == "LCTRL"  or key == "RCTRL"  or
-       key == "LALT"   or key == "RALT"   then return end
-    self:EnableKeyboard(false)
-    local btn = self.waitBtn
-    self.waitBtn = nil
-    local binding = ""
-    if key ~= "ESCAPE" then
-        if IsShiftKeyDown()   then binding = "SHIFT-" end
-        if IsControlKeyDown() then binding = "CTRL-"  end
-        if IsAltKeyDown()     then binding = "ALT-"   end
-        binding = binding .. key
-    end
-    if DB then DB.bindings = DB.bindings or {}; DB.bindings[btn.slotKey] = binding end
-    if binding ~= "" then
-        SetBindingClick(binding, "GHSlot"..btn.slotIdx)
-        btn.txt:SetText("|cffFFD700"..binding.."|r")
-    else
-        local old = DB and DB.bindings and DB.bindings[btn.slotKey]
-        if old and old ~= "" then SetBinding(old) end
-        btn.txt:SetText(IS_DE and "keine" or "none")
-    end
-    btn.bg:SetColorTexture(DGOLD[1]*0.3, DGOLD[2]*0.3, DGOLD[3]*0.3, 0.5)
-    GH_ApplyBindings()
-end)
+local bindHint2 = CF(CFG, 6, GREY[1], GREY[2], GREY[3])
+bindHint2:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -120)
+bindHint2:SetText(IS_DE and "ESC -> Tastenbel. -> Addons" or "ESC -> Key Bindings -> AddOns")
 
--- Bind-Buttons pro Spell
-local bindBtns = {}
-for idx, key in ipairs(CD_ORDER) do
-    local rowY = -118 - (idx-1)*15
-    local nameTxt = CF(CFG, 7, WHITE[1], WHITE[2], WHITE[3])
-    nameTxt:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, rowY)
-    nameTxt:SetText(SPELL_GROUPS[key].label)
+local bindHint3 = CF(CFG, 6, GREY[1], GREY[2], GREY[3])
+bindHint3:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -132)
+bindHint3:SetText(IS_DE and "Dort: GHSlot1-7 belegen" or "There: bind GHSlot1-7")
 
-    local bb = CreateFrame("Button", nil, CFG)
-    bb:SetSize(96, 13)
-    bb:SetPoint("TOPLEFT", CFG, "TOPLEFT", 80, rowY)
-    local bbBG = CT(bb, "BACKGROUND", DGOLD[1]*0.3, DGOLD[2]*0.3, DGOLD[3]*0.3, 0.5)
-    bbBG:SetAllPoints()
-    bb.bg = bbBG
-    local bbTxt = CF(bb, 7, WHITE[1], WHITE[2], WHITE[3])
-    bbTxt:SetAllPoints(); bbTxt:SetJustifyH("CENTER")
-    bbTxt:SetText(IS_DE and "keine" or "none")
-    bb.txt = bbTxt
-    bb.slotKey = key
-    bb.slotIdx = idx
+CFG:SetHeight(170)
 
-    bb:SetScript("OnClick", function(self)
-        -- Reset alle
-        for _, b in ipairs(bindBtns) do
-            b.bg:SetColorTexture(DGOLD[1]*0.3, DGOLD[2]*0.3, DGOLD[3]*0.3, 0.5)
-        end
-        self.bg:SetColorTexture(ORANGE[1]*0.4, ORANGE[2]*0.2, 0, 0.8)
-        self.txt:SetText(IS_DE and "|cffFFFF00Taste...|r" or "|cffFFFF00Key...|r")
-        GHKeyListener.waitBtn = self
-        GHKeyListener:EnableKeyboard(true)
-    end)
-    bb:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(IS_DE and "Klicken, dann Taste druecken" or "Click, then press key", 1,1,1)
-        GameTooltip:AddLine(IS_DE and "ESC = loeschen" or "ESC = clear", 0.7,0.7,0.7)
-        GameTooltip:Show()
-    end)
-    bb:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    bindBtns[idx] = bb
-end
-
--- Config-Höhe dynamisch anpassen
-local cfgH = 118 + #CD_ORDER * 15 + 26
-CFG:SetHeight(cfgH)
-
--- Save/Cancel ganz unten
-local btnSave = MakeBtn(L.CFG_SAVE, 8, -(cfgH-22), function()
+local btnSave = MakeBtn(L.CFG_SAVE, 15, -148, function()
     print("|cffC8A84BGuardianHelper:|r " .. L.MSG_SAVED)
-    -- Bindings aktualisieren
-    if DB and DB.bindings then
-        for idx2, bb in ipairs(bindBtns) do
-            local cur = DB.bindings[bb.slotKey]
-            if cur and cur ~= "" then
-                bb.txt:SetText("|cffFFD700"..cur.."|r")
-            else
-                bb.txt:SetText(IS_DE and "keine" or "none")
-            end
-        end
-    end
     CFG:Hide()
 end)
-btnSave:SetSize(88, 18)
+btnSave:SetSize(80, 18)
 btnSave:SetPoint("BOTTOMLEFT", CFG, "BOTTOMLEFT", 8, 6)
 
-local btnCancel = MakeBtn(L.CFG_CANCEL, 104, -(cfgH-22), function()
-    CFG:Hide()
-end)
-btnCancel:SetSize(88, 18)
+local btnCancel = MakeBtn(L.CFG_CANCEL, 110, -148, function() CFG:Hide() end)
+btnCancel:SetSize(80, 18)
 btnCancel:SetPoint("BOTTOMRIGHT", CFG, "BOTTOMRIGHT", -8, 6)
-
--- Binding-Anzeige beim Öffnen des Config-Panels aktualisieren
-CFG:SetScript("OnShow", function()
-    if not DB or not DB.bindings then return end
-    for idx3, bb in ipairs(bindBtns) do
-        local cur = DB.bindings[bb.slotKey]
-        if cur and cur ~= "" then
-            bb.txt:SetText("|cffFFD700"..cur.."|r")
-        else
-            bb.txt:SetText(IS_DE and "keine" or "none")
-        end
-    end
-end)
 
 -- ============================================================
 -- SPELL CACHE
@@ -659,33 +560,13 @@ local function BuildCache()
                     if rd.id == sid then
                         local c = cache[key]
                         if not c or rd.lv > c.lv then
-                            cache[key] = {id=sid, lv=rd.lv, slot=i,
-                                icon=GetSpellTexture(sid), name=GetSpellInfo(sid)}
+                            cache[key] = {id=sid, lv=rd.lv, slot=i, icon=GetSpellTexture(sid)}
                         end
                     end
                 end
             end
         end
         i = i + 1
-    end
-    -- Nur Spell-Namen auf Buttons setzen (kein SetBinding hier — wuerde UI tainten)
-    for _, f in ipairs(cdSlots) do
-        local c = cache[f.key]
-        if c then f.spellName = c.name end
-    end
-end
-
--- Tastenbelegungen anwenden
-function GH_ApplyBindings()
-    if not DB or not DB.bindings then return end
-    for idx, f in ipairs(cdSlots) do
-        local bind = DB.bindings[f.key]
-        if bind and bind ~= "" then
-            SetBindingClick(bind, "GHSlot"..idx)
-            f.lbl:SetText("|cffFFD700"..bind.."|r")
-        else
-            f.lbl:SetText(SPELL_GROUPS[f.key].label)
-        end
     end
 end
 
@@ -753,7 +634,6 @@ EF:SetScript("OnEvent", function(self, event, ...)
         DB.alpha      = DB.alpha or 0.95
         DB.locked     = DB.locked or false
         DB.maulAlert  = DB.maulAlert == nil and true or DB.maulAlert
-        DB.bindings   = DB.bindings or {}
         Frame:SetAlpha(DB.alpha)
         if DB.x and DB.y then
             Frame:ClearAllPoints()
@@ -763,14 +643,33 @@ EF:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "PLAYER_LOGIN" then
         BuildCache()
-        GH_ApplyBindings()  -- sicher: Login-Phase, kein Taint
+        -- Spell-Attribute auf SecureActionButtons setzen (sicher bei Login)
+        for _, f in ipairs(cdSlots) do
+            local c = cache[f.key]
+            if c and c.name then
+                f:SetAttribute("spell", c.name)
+                f.spellName = c.name
+            end
+        end
         print("|cffC8A84BGuardianHelper|r v"..VERSION.." "..L.MSG_LOADED.."  |cffaaaaaa/gh help|r")
 
     elseif event == "PLAYER_LEVEL_UP" then
         local df = CreateFrame("Frame"); local el = 0
         df:SetScript("OnUpdate", function(s,e)
             el = el + e
-            if el >= 0.5 then s:SetScript("OnUpdate",nil); BuildCache() end
+            if el >= 0.5 then
+                s:SetScript("OnUpdate",nil)
+                BuildCache()
+                if not InCombatLockdown() then
+                    for _, f in ipairs(cdSlots) do
+                        local c = cache[f.key]
+                        if c and c.name then
+                            f:SetAttribute("spell", c.name)
+                            f.spellName = c.name
+                        end
+                    end
+                end
+            end
         end)
 
     elseif event == "SPELLS_CHANGED" then
