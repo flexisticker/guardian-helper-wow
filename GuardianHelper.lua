@@ -465,36 +465,40 @@ EventFrame:SetScript("OnEvent", function(self, event, ...)
     elseif event == "PLAYER_LEVEL_UP" then
         local newLevel = ...
         -- Cache neu aufbauen nach kurzem Delay (Spellbook braucht einen Moment)
-        C_Timer and C_Timer.After(0.5, function()
-            RebuildSpellCache()
-            RebuildMaulIDs()
-            UpdateAllActionBars()
-            print(string.format("|cff00cc44GuardianHelper:|r Level %d erreicht — Aktionsleisten geprüft!", newLevel))
-        end) or (function()
-            -- Fallback ohne C_Timer (sehr altes API)
-            RebuildSpellCache()
-            RebuildMaulIDs()
-            UpdateAllActionBars()
-        end)()
+        -- Delay via Frame da C_Timer in TBC nicht verfügbar sein kann
+        local delayFrame = CreateFrame("Frame")
+        local elapsed = 0
+        delayFrame:SetScript("OnUpdate", function(self, e)
+            elapsed = elapsed + e
+            if elapsed >= 0.5 then
+                self:SetScript("OnUpdate", nil)
+                RebuildSpellCache()
+                RebuildMaulIDs()
+                UpdateAllActionBars()
+                print(string.format("|cff00cc44GuardianHelper:|r Level %d erreicht — Aktionsleisten geprüft!", newLevel))
+            end
+        end)
 
     elseif event == "SPELLS_CHANGED" then
         RebuildSpellCache()
         RebuildMaulIDs()
 
     elseif event == "LEARNED_SPELL_IN_TAB" then
-        -- Neuer Spell gelernt → sofort Aktionsleiste updaten
-        C_Timer and C_Timer.After(0.3, function()
-            RebuildSpellCache()
-            RebuildMaulIDs()
-            UpdateAllActionBars()
-        end) or (function()
-            RebuildSpellCache()
-            RebuildMaulIDs()
-            UpdateAllActionBars()
-        end)()
+        local delayFrame2 = CreateFrame("Frame")
+        local elapsed2 = 0
+        delayFrame2:SetScript("OnUpdate", function(self, e)
+            elapsed2 = elapsed2 + e
+            if elapsed2 >= 0.3 then
+                self:SetScript("OnUpdate", nil)
+                RebuildSpellCache()
+                RebuildMaulIDs()
+                UpdateAllActionBars()
+            end
+        end)
 
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
-        local _, subEvent, _, srcGUID, _, _, _, _, _, _, _, spellID = CombatLogGetCurrentEventInfo()
+        -- TBC Classic: Parameter kommen als Argumente, nicht via CombatLogGetCurrentEventInfo
+        local _, subEvent, _, srcGUID, _, _, _, _, _, _, _, spellID = ...
         if srcGUID ~= UnitGUID("player") then return end
 
         if subEvent == "SPELL_CAST_START" and maulIDs[spellID] then
