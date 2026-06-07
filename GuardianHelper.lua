@@ -377,7 +377,7 @@ MM:SetScript("OnEnter", function(self)
     GameTooltip:AddLine("Drag: Verschieben", 0.7, 0.7, 0.7)
     GameTooltip:Show()
 end)
-MM:SetScript("OnLeave", GameTooltip.Hide)
+MM:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 -- ============================================================
 -- CONFIG PANEL (einfach & robust)
