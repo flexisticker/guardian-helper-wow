@@ -299,17 +299,11 @@ for i, key in ipairs(CD_ORDER) do
     clbl:SetText(SPELL_GROUPS[key].label)
     cf.lbl = clbl
 
-    -- Click-to-Cast (nur außerhalb Combat via CastSpellByName)
+    -- Click-to-Cast: nur außerhalb Kampf erlaubt (kein Taint)
     cf:SetScript("OnClick", function(self)
-        if self.spellName then
-            if InCombatLockdown() then
-                -- Im Kampf: Bindung nutzen, direkter Cast nicht erlaubt
-                print("|cffC8A84BGuardianHelper:|r " .. self.spellName ..
-                      (IS_DE and " -> Taste benutzen!" or " -> use keybind!"))
-            else
-                CastSpellByName(self.spellName)
-            end
-        end
+        if not self.spellName then return end
+        if InCombatLockdown() then return end  -- im Kampf: nichts tun, Taste verwenden
+        CastSpellByName(self.spellName)
     end)
 
     -- Tooltip
@@ -674,14 +668,11 @@ local function BuildCache()
         end
         i = i + 1
     end
-    -- Spell-Namen auf Buttons setzen + Keybindings anwenden
+    -- Nur Spell-Namen auf Buttons setzen (kein SetBinding hier — wuerde UI tainten)
     for _, f in ipairs(cdSlots) do
         local c = cache[f.key]
-        if c then
-            f.spellName = c.name
-        end
+        if c then f.spellName = c.name end
     end
-    GH_ApplyBindings()
 end
 
 -- Tastenbelegungen anwenden
@@ -772,6 +763,7 @@ EF:SetScript("OnEvent", function(self, event, ...)
 
     elseif event == "PLAYER_LOGIN" then
         BuildCache()
+        GH_ApplyBindings()  -- sicher: Login-Phase, kein Taint
         print("|cffC8A84BGuardianHelper|r v"..VERSION.." "..L.MSG_LOADED.."  |cffaaaaaa/gh help|r")
 
     elseif event == "PLAYER_LEVEL_UP" then
