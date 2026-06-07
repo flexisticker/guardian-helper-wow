@@ -1,0 +1,10 @@
+## Interface: 20504
+## Title: |cff8B4513Guardian|r|cffffffffHelper|r
+## Notes: Guardian Druid Tank Assistant — Level 1-70 (Classic & TBC)
+## Author: Claude & Micha
+## Version: 2.0.0
+## DefaultState: Enabled
+## X-Classic-Version: 1.14.3
+## X-TBC-Version: 2.5.4
+
+GuardianHelper.lua

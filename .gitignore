@@ -1,0 +1,11 @@
+# WoW SavedVariables (lokale Einstellungen, nicht ins Repo)
+*.lua.bak
+SavedVariables/
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+*.swp
