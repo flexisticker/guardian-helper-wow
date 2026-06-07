@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   release:
     name: Build & Publish
@@ -13,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: GuardianHelper ${{ github.ref_name }}
           body_path: CHANGELOG.md
@@ -23,9 +26,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # CurseForge Upload — benoetigt:
-      # 1. Secret CF_API_KEY in GitHub Repo Settings hinzufuegen
-      # 2. X-Curse-Project-ID in GuardianHelper.toc eintragen
+      # CurseForge Upload
       - name: Publish to CurseForge
         uses: BigWigsMods/packager@v2
         env:
