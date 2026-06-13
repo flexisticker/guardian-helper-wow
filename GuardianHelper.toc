@@ -3,12 +3,12 @@
 ## Notes: Guardian Druid Tank Assistant — Level 1-70
 ## Notes-deDE: Baeren-Druide Tank Assistent — Level 1-70
 ## Author: flexisticker
-## Version: 2.1.0
+## Version: 4.3.1
 ## DefaultState: Enabled
 ## X-Curse-Project-ID: 1567398
 ## X-GitHub: https://github.com/flexisticker/guardian-helper-wow
 ## X-License: MIT
-## IconTexture: Interface\AddOns\GuardianHelper\icon
+## IconTexture: InterfaceAddOnsGuardianHelpericon
 ## SavedVariables: GuardianHelperDB
 
 GuardianHelper.lua
