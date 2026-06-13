@@ -1,5 +1,7 @@
 package-as: GuardianHelper
 
+curse-game-version-latest: bcc
+
 ignore:
   - .pkgmeta
   - .gitignore
