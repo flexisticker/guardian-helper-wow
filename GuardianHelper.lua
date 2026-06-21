@@ -1080,7 +1080,8 @@ EF:RegisterEvent("PLAYER_LEVEL_UP")
 EF:RegisterEvent("SPELLS_CHANGED")
 EF:RegisterEvent("PLAYER_REGEN_DISABLED")
 EF:RegisterEvent("PLAYER_REGEN_ENABLED")
-EF:RegisterEvent("PARTY_MEMBERS_CHANGED")
+EF:RegisterEvent("PARTY_MEMBER_ENABLE")
+EF:RegisterEvent("PARTY_MEMBER_DISABLE")
 EF:RegisterEvent("RAID_ROSTER_UPDATE")
 EF:RegisterEvent("PLAYER_ENTERING_WORLD")
 EF:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
@@ -1116,7 +1117,7 @@ EF:SetScript("OnEvent", function(self, event, ...)
     elseif event == "PLAYER_ENTERING_WORLD" then
         RebuildRoster()
 
-    elseif event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+    elseif event == "PARTY_MEMBER_ENABLE" or event == "PARTY_MEMBER_DISABLE" or event == "RAID_ROSTER_UPDATE" then
         RebuildRoster()
         aggroData   = {}  -- Alte Daten löschen nach Roster-Änderung
         healerCache = {}
