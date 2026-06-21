@@ -1245,26 +1245,30 @@ EF:SetScript("OnEvent", function(self, event, ...)
         local srcGUID  = a[4]
         local srcName  = a[5]
         local dstGUID, dstName
-        -- Hilfsfunktion: ist ein GUID ein bekannter Spieler (Roster oder eigener Char)?
         local function isPlayer(g) return g and (g == pGUID or roster[g]) end
         local function isNPC(g)    return g and g ~= "" and not isPlayer(g) end
-
-        -- Format A (mit hideCaster): a[3]=bool, a[4]=srcGUID, a[8]=dstGUID
-        -- Format B (ohne hideCaster): a[3]=srcGUID, a[4]=srcName, a[7]=dstGUID
-        -- Strategie: probiere Format A zuerst (srcGUID an Pos 4 erkennbar als GUID-String)
         local function looksLikeGUID(s) return type(s)=="string" and s:find("-",1,true) end
 
         if looksLikeGUID(a[4]) then
-            -- Format A: a[4]=srcGUID, a[8]=dstGUID
             srcGUID=a[4]; srcName=a[5]; dstGUID=a[8]; dstName=a[9]
         elseif looksLikeGUID(a[3]) then
-            -- Format B: a[3]=srcGUID, a[7]=dstGUID
             srcGUID=a[3]; srcName=a[4]; dstGUID=a[7]; dstName=a[8]; spellPos=10
         else
+            if GH_DEBUG then
+                print("|cffff4444GH-DBG|r kein GUID in a[3]/a[4]: sub="..tostring(sub)
+                    .." a[3]="..tostring(a[3]).." a[4]="..tostring(a[4]))
+            end
             return
         end
 
-        -- Nur Events verarbeiten die uns oder unsere Gruppe betreffen
+        if GH_DEBUG and (sub=="SWING_DAMAGE" or sub=="SWING_MISSED" or sub=="SPELL_DAMAGE" or sub=="SPELL_MISSED") then
+            print(string.format("|cff44ff44GH-DBG|r %s src=%s(%s) dst=%s(%s) isSrcNPC=%s isDstPlayer=%s",
+                sub,
+                tostring(srcName), tostring(srcGUID and srcGUID:sub(1,12)),
+                tostring(dstName), tostring(dstGUID and dstGUID:sub(1,12)),
+                tostring(isNPC(srcGUID)), tostring(isPlayer(dstGUID))))
+        end
+
         if not isPlayer(srcGUID) and not isPlayer(dstGUID) then return end
 
         -- ① Auto-Angriff + Maul Tracking (eigener Spieler als Angreifer)
@@ -1283,6 +1287,9 @@ EF:SetScript("OnEvent", function(self, event, ...)
             if sub=="SWING_DAMAGE" or sub=="SWING_MISSED"
             or sub=="SPELL_DAMAGE" or sub=="SPELL_MISSED"
             or sub=="RANGE_DAMAGE" or sub=="RANGE_MISSED" then
+                if GH_DEBUG then
+                    print("|cff00ccffGH-DBG|r RecordAttack: "..tostring(srcName).." -> "..tostring(dstName))
+                end
                 RecordAttack(srcGUID, srcName or "?", dstGUID)
             end
         end
@@ -1297,6 +1304,7 @@ end)
 -- ============================================================
 -- UPDATE LOOP
 -- ============================================================
+local GH_DEBUG  = false   -- /gh debug toggle
 local tick      = 0
 local threatTick = 0
 Frame:SetScript("OnUpdate", function(self, dt)
@@ -1486,6 +1494,13 @@ SlashCmdList["GH"] = function(msg)
     if msg == "lock" then
         if DB then DB.locked = not DB.locked end
         print("|cff14CCADGuardianHelper:|r " .. (DB and DB.locked and L.MSG_LOCKED or L.MSG_UNLOCKED))
+    elseif msg == "debug" then
+        GH_DEBUG = not GH_DEBUG
+        print("|cff14CCADGuardianHelper:|r Debug " .. (GH_DEBUG and "|cff00ff00AN|r" or "|cffff4444AUS|r"))
+        if GH_DEBUG then
+            print("  pGUID=" .. tostring(UnitGUID("player")))
+            print("  Roster-Einträge: " .. (function() local n=0; for _ in pairs(roster) do n=n+1 end; return n end)())
+        end
     elseif msg == "hide"  then Frame:Hide()
     elseif msg == "show"  then Frame:Show()
     elseif msg == "aggro" then
