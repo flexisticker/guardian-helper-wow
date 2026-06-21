@@ -1,5 +1,23 @@
 # Changelog
 
+## [4.8.0-beta] - 2026-06-21
+
+### Neu
+- **Aggro Monitor: Spieler immer sichtbar** — eigene Zeile immer an Position 1 (Teal-Farbe), zeigt eigene Mob-Anzahl oder `--`
+- **Config: „Aggro: nur im Kampf"** — Monitor erscheint automatisch beim Pull und verschwindet nach Kampfende
+- **Config: „Aggro Pos. reset"** — Button zum Zurücksetzen der Monitor-Position auf Standard
+- **Minimap Rechtsklick** öffnet Config-Panel (Linksklick = Haupt-Panel wie bisher)
+
+### Fix
+- `CFG` Forward-Declaration vor Minimap-Button (nil value bei OnClick)
+- `DebuffOnTarget` und `HasBuff` matchen jetzt per SpellID (Pos 9/10) + Name-Fallback — Feenfeuer-Erkennung robust
+- Config-Panel Layout: doppeltes `Sep` entfernt, Höhe angepasst, Speichern/Abbrechen-Buttons korrekt positioniert
+- `PARTY_MEMBERS_CHANGED` → `PARTY_MEMBER_ENABLE` + `PARTY_MEMBER_DISABLE` (TBC Classic API)
+- Aggro-Monitor Teal-Stripe nil-chain fix (Zeile-Chaining über Zeilenumbruch)
+
+### Geändert
+- Version 4.8.0 / TOC 2.5.0
+
 ## [4.7.0-beta] - 2026-06-21
 
 ### Neu — Aggro Monitor (Gruppe/Raid Threat Tracker)
