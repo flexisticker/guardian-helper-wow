@@ -599,11 +599,12 @@ local function AddCheck(label, key, yOff)
     cfgChecks[key] = btn
 end
 
-AddCheck(IS_DE and "Maul-Alert"          or "Maul Queue Alert",   "maulAlert",   -32)
-AddCheck(IS_DE and "Sound: Formverlust"  or "Sound: Form Loss",   "soundFormLoss",-48)
-AddCheck(IS_DE and "Sound: Auto-Aus"     or "Sound: Auto-Off",    "soundAutoOff", -64)
-AddCheck(IS_DE and "Nur in Kampf zeigen" or "Show in Combat only","combatOnly",   -80)
-Sep(CFG, -96)
+AddCheck(IS_DE and "Maul-Alert"              or "Maul Queue Alert",    "maulAlert",          -32)
+AddCheck(IS_DE and "Sound: Formverlust"      or "Sound: Form Loss",    "soundFormLoss",       -48)
+AddCheck(IS_DE and "Sound: Auto-Aus"         or "Sound: Auto-Off",     "soundAutoOff",        -64)
+AddCheck(IS_DE and "Nur in Kampf zeigen"     or "Show in Combat only", "combatOnly",          -80)
+AddCheck(IS_DE and "Aggro: nur im Kampf"     or "Aggro: combat only",  "aggroOnlyInCombat",   -96)
+Sep(CFG, -112)
 
 local function MakeBtn(label, xOff, yOff, w2, onClick)
     local b = CreateFrame("Button", nil, CFG)
@@ -667,60 +668,67 @@ end
 
 -- Label + 6 Sound-Buttons für Auto-Off
 local aoLbl = CF(CFG, 7, DIM[1], DIM[2], DIM[3])
-aoLbl:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -104)
+aoLbl:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -120)
 aoLbl:SetText(IS_DE and "Auto-Off Sound:" or "Auto-Off Sound:")
 
 for i = 1, #SOUNDS do
     local bx = 8 + (i-1) * (SND_BTN_W + SND_GAP)
-    MakeSndBtn(CFG, i, bx, -116, sndBtns_ao, "soundAutoOffIdx")
+    MakeSndBtn(CFG, i, bx, -132, sndBtns_ao, "soundAutoOffIdx")
 end
 
-Sep(CFG, -133)
+Sep(CFG, -149)
 
 -- Label + 6 Sound-Buttons für Buff-Warnung
 local buffLbl = CF(CFG, 7, DIM[1], DIM[2], DIM[3])
-buffLbl:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -141)
+buffLbl:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -157)
 buffLbl:SetText(IS_DE and "Buff-Warnung Sound:" or "Buff Warning Sound:")
 
 for i = 1, #SOUNDS do
     local bx = 8 + (i-1) * (SND_BTN_W + SND_GAP)
-    MakeSndBtn(CFG, i, bx, -153, sndBtns_buff, "soundBuffIdx")
+    MakeSndBtn(CFG, i, bx, -169, sndBtns_buff, "soundBuffIdx")
 end
 
-Sep(CFG, -170)
+Sep(CFG, -186)
 
 -- Opacity
 local opLbl = CF(CFG, 7, DIM[1], DIM[2], DIM[3])
-opLbl:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -178)
+opLbl:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -194)
 opLbl:SetText(IS_DE and "Deckkraft:" or "Opacity:")
 local opVal = CF(CFG, 8, WHITE[1], WHITE[2], WHITE[3])
-opVal:SetPoint("TOPLEFT", CFG, "TOPLEFT", 68, -178)
+opVal:SetPoint("TOPLEFT", CFG, "TOPLEFT", 68, -194)
 opVal:SetText("94%")
 
-MakeBtn(" - ", 100, -174, 24, function()
+MakeBtn(" - ", 100, -190, 24, function()
     if not DB then return end
     DB.alpha = math.max(0.3, DB.alpha - 0.05)
     Frame:SetAlpha(DB.alpha)
     opVal:SetText(string.format("%d%%", DB.alpha * 100))
 end)
-MakeBtn(" + ", 128, -174, 24, function()
+MakeBtn(" + ", 128, -190, 24, function()
     if not DB then return end
     DB.alpha = math.min(1.0, DB.alpha + 0.05)
     Frame:SetAlpha(DB.alpha)
     opVal:SetText(string.format("%d%%", DB.alpha * 100))
 end)
 
-Sep(CFG, -192)
+-- Aggro Monitor Reset-Position Button
+MakeBtn(IS_DE and "Aggro Pos. reset" or "Aggro Pos. reset", 8, -207, 130, function()
+    TF:ClearAllPoints()
+    TF:SetPoint("CENTER", UIParent, "CENTER", 560, 0)
+    if DB then DB.tx = nil; DB.ty = nil end
+end)
+
+Sep(CFG, -224)
 local bindHint = CF(CFG, 6, DIM[1], DIM[2], DIM[3])
-bindHint:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -200)
+bindHint:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -232)
 bindHint:SetText(IS_DE and "Tasten: ESC -> Tastenbel. -> Addons" or "Keys: ESC -> Bindings -> AddOns")
 
-CFG:SetHeight(248)
-local btnSave = MakeBtn(L.CFG_SAVE, 8, -214, 86, function()
+CFG:SetHeight(282)
+local btnSave = MakeBtn(L.CFG_SAVE, 8, -246, 86, function()
     print("|cff14CCADGuardianHelper:|r " .. L.MSG_SAVED)
     CFG:Hide()
 end)
-local btnCancel = MakeBtn(L.CFG_CANCEL, 106, -214, 86, function() CFG:Hide() end)
+local btnCancel = MakeBtn(L.CFG_CANCEL, 106, -246, 86, function() CFG:Hide() end)
 
 -- Refresh-Funktion für Sound-Button-Highlighting (wird nach DB-Load aufgerufen)
 function RefreshSoundBtns()
@@ -1000,55 +1008,98 @@ TF:Hide()
 -- Update-Funktion für den Aggro-Monitor
 local function UpdateThreatUI()
     CleanAggro()
-    local list = {}
+    local pGUID = UnitGUID("player")
+
+    -- Spieler-Eintrag immer als erste Zeile
+    local pData  = aggroData[pGUID]
+    local pCount = pData and pData.count or 0
+    local pMobs  = {}
+    if pData then
+        for _, mob in pairs(pData.attackers) do table.insert(pMobs, mob.name) end
+    end
+    local list = {{
+        name=">> "..(UnitName("player") or "Du"),
+        class="DRUID", unitId="player",
+        count=pCount, mobs=pMobs,
+        isHealer=false, isSelf=true,
+    }}
+
+    -- Andere Gruppenmitglieder mit Aggro
     for pguid, e in pairs(aggroData) do
-        local p = roster[pguid]
-        if p and e.count > 0 then
-            local mbs = {}
-            for _, mob in pairs(e.attackers) do table.insert(mbs, mob.name) end
-            table.insert(list, {
-                name    = p.name, class = p.class, unitId = p.unitId,
-                count   = e.count, mobs = mbs,
-                isHealer= HEALER_CLASSES[p.class] or healerCache[pguid] or false,
-            })
+        if pguid ~= pGUID then
+            local p = roster[pguid]
+            if p and e.count > 0 then
+                local mbs = {}
+                for _, mob in pairs(e.attackers) do table.insert(mbs, mob.name) end
+                table.insert(list, {
+                    name=p.name, class=p.class, unitId=p.unitId,
+                    count=e.count, mobs=mbs,
+                    isHealer=HEALER_CLASSES[p.class] or healerCache[pguid] or false,
+                    isSelf=false,
+                })
+            end
         end
     end
-    table.sort(list, function(a,b) return a.count > b.count end)
+    -- Alle außer Spieler nach Mob-Anzahl sortieren (Spieler bleibt Index 1)
+    if #list > 2 then
+        local others = {}
+        for i = 2, #list do others[#others+1] = list[i] end
+        table.sort(others, function(a,b) return a.count > b.count end)
+        for i, v in ipairs(others) do list[i+1] = v end
+    end
 
     local n = #list
-    thInfo:SetText(n > 0 and n.." ".. (IS_DE and "Spieler" or "player") or "")
-    tEmpty:SetShown(n == 0)
+    local othersWithAggro = n - 1  -- ohne Spieler
+    thInfo:SetText(othersWithAggro > 0 and othersWithAggro.." "..(IS_DE and "Spieler" or "player") or "")
+    tEmpty:SetShown(false)  -- Spieler-Zeile ist immer da
 
     for i = 1, MAX_TR do
         local row = tRows[i]
         local d   = list[i]
         if d then
             row:Show()
-            local cc = CLASS_COLOR[d.class] or {0.7,0.7,0.7}
-            row.clr:SetColorTexture(cc[1],cc[2],cc[3],1)
-            if d.isHealer then
-                row.bg:SetColorTexture(0.25,0.03,0.03,0.75)
-                row.hbadge:SetText("[H]")
-                row.nameL:SetTextColor(1.0,0.45,0.45)
-            else
-                row.bg:SetColorTexture(BG2[1],BG2[2],BG2[3],0.5)
+            if d.isSelf then
+                -- Spieler-Zeile: Teal Akzent statt Klassenfarbe
+                row.clr:SetColorTexture(ACCENT[1],ACCENT[2],ACCENT[3],1)
+                if pCount >= 1 then
+                    row.bg:SetColorTexture(0.02,0.10,0.12,0.85)
+                else
+                    row.bg:SetColorTexture(BG2[1],BG2[2],BG2[3],0.4)
+                end
                 row.hbadge:SetText("")
-                row.nameL:SetTextColor(WHITE[1],WHITE[2],WHITE[3])
+                row.nameL:SetTextColor(ACCENT[1],ACCENT[2],ACCENT[3])
+                local nm = d.name; if #nm>16 then nm=nm:sub(1,15)..".." end
+                row.nameL:SetText(nm)
+                if pCount >= 1 then
+                    local cc2 = pCount>=3 and RED or (pCount==2 and ORANGE or GREEN)
+                    row.cntL:SetText(pCount.."x")
+                    row.cntL:SetTextColor(cc2[1],cc2[2],cc2[3])
+                else
+                    row.cntL:SetText("--")
+                    row.cntL:SetTextColor(DIM[1],DIM[2],DIM[3])
+                end
+            else
+                local cc = CLASS_COLOR[d.class] or {0.7,0.7,0.7}
+                row.clr:SetColorTexture(cc[1],cc[2],cc[3],1)
+                if d.isHealer then
+                    row.bg:SetColorTexture(0.25,0.03,0.03,0.75)
+                    row.hbadge:SetText("[H]")
+                    row.nameL:SetTextColor(1.0,0.45,0.45)
+                else
+                    row.bg:SetColorTexture(BG2[1],BG2[2],BG2[3],0.5)
+                    row.hbadge:SetText("")
+                    row.nameL:SetTextColor(WHITE[1],WHITE[2],WHITE[3])
+                end
+                local nm = d.name; if #nm>12 then nm=nm:sub(1,11)..".." end
+                row.nameL:SetText(nm)
+                local cc2 = d.count>=3 and RED or (d.count==2 and ORANGE or WHITE)
+                row.cntL:SetText(d.count.."x")
+                row.cntL:SetTextColor(cc2[1],cc2[2],cc2[3])
             end
-            local nm = d.name; if #nm>12 then nm=nm:sub(1,11)..".." end
-            row.nameL:SetText(nm)
-            local cc2 = d.count>=3 and RED or (d.count==2 and ORANGE or WHITE)
-            row.cntL:SetText(d.count.."x")
-            row.cntL:SetTextColor(cc2[1],cc2[2],cc2[3])
             row.mobs = d.mobs
-            -- Secure target: außerhalb Kampf setzbar
             if not InCombatLockdown() then
                 local uid = d.unitId
-                if uid == "player" then
-                    row:SetAttribute("unit","target")
-                else
-                    row:SetAttribute("unit", uid.."target")
-                end
+                row:SetAttribute("unit", uid == "player" and "target" or uid.."target")
             end
         else
             row:Hide()
@@ -1102,7 +1153,8 @@ EF:SetScript("OnEvent", function(self, event, ...)
         DB.soundAutoOff    = DB.soundAutoOff    == nil and true or DB.soundAutoOff
         DB.soundAutoOffIdx = DB.soundAutoOffIdx or 2
         DB.soundBuffIdx    = DB.soundBuffIdx    or 1
-        DB.showAggro       = DB.showAggro       == nil and true or DB.showAggro
+        DB.showAggro          = DB.showAggro          == nil and true  or DB.showAggro
+        DB.aggroOnlyInCombat  = DB.aggroOnlyInCombat  == nil and false or DB.aggroOnlyInCombat
         Frame:SetAlpha(DB.alpha)
         if DB.x and DB.y then
             Frame:ClearAllPoints()
@@ -1112,7 +1164,7 @@ EF:SetScript("OnEvent", function(self, event, ...)
             TF:ClearAllPoints()
             TF:SetPoint("CENTER", UIParent, "CENTER", DB.tx, DB.ty)
         end
-        if DB.showAggro then TF:Show() else TF:Hide() end
+        if DB.showAggro and not DB.aggroOnlyInCombat then TF:Show() else TF:Hide() end
         opVal:SetText(string.format("%d%%", DB.alpha * 100))
         for key, btn in pairs(cfgChecks) do
             btn.check:SetText(DB[key] and "v" or "")
@@ -1128,10 +1180,10 @@ EF:SetScript("OnEvent", function(self, event, ...)
         healerCache = {}
 
     elseif event == "PLAYER_REGEN_ENABLED" then
-        -- Kampf beendet: Aggro-Daten zurücksetzen
         aggroData   = {}
         healerCache = {}
         UpdateThreatUI()
+        if DB and DB.showAggro and DB.aggroOnlyInCombat then TF:Hide() end
 
     elseif event == "PLAYER_LOGIN" then
         BuildCache()
@@ -1162,7 +1214,7 @@ EF:SetScript("OnEvent", function(self, event, ...)
         BuildCache()
 
     elseif event == "PLAYER_REGEN_DISABLED" then
-        -- Kampfbeginn: Timer zurücksetzen + Buff-Check mit Sound
+        if DB and DB.showAggro and DB.aggroOnlyInCombat then TF:Show() end
         lastSwingTime = GetTime()
         if DB and DB.soundFormLoss then
             local pLevel = UnitLevel("player")
