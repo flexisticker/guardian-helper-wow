@@ -1,8 +1,8 @@
 -- ============================================================
--- GuardianHelper v4.8 — Aggro Monitor + Config
+-- GuardianHelper v4.9 — Aggro Monitor + Config
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.8.0"
+local VERSION = "4.9.0"
 
 local DB
 local LOCALE = GetLocale()
@@ -1239,18 +1239,22 @@ EF:SetScript("OnEvent", function(self, event, ...)
         local srcGUID  = a[4]
         local srcName  = a[5]
         local dstGUID, dstName
-        if srcGUID == pGUID or (roster[srcGUID] and srcGUID:sub(1,6)=="Player") then
+        -- Format A (mit hideCaster): pos3=hideCaster, pos4=srcGUID, pos8=dstGUID
+        -- Format B (ohne hideCaster): pos3=srcGUID, pos7=dstGUID
+        -- Wir erkennen das Format anhand ob pos4 im Roster oder == pGUID ist
+        local isFormatA = (a[4] == pGUID or roster[a[4]])
+        local isFormatB = (a[3] == pGUID or roster[a[3]])
+        if isFormatA then
             dstGUID = a[8]; dstName = a[9]
-        elseif a[3] == pGUID or (roster[a[3]] and (a[3] or ""):sub(1,6)=="Player") then
+        elseif isFormatB then
             srcGUID=a[3]; srcName=a[4]; dstGUID=a[7]; dstName=a[8]; spellPos=10
         else
-            -- Prüfe ob Source ein NPC ist der einen Spieler angreift
-            -- NPC-GUIDs starten mit "Creature-" oder ähnlich (nicht "Player-")
-            local sg = a[4] or ""
-            local dg = a[8] or ""
-            if sg:sub(1,8) ~= "Player-0" and dg:sub(1,8) == "Player-0" then
+            -- NPC greift Spieler an: src nicht im Roster, dst im Roster
+            local sg4, dg8 = a[4] or "", a[8] or ""
+            local sg3, dg7 = a[3] or "", a[7] or ""
+            if sg4 ~= "" and roster[dg8] and not roster[sg4] then
                 srcGUID=a[4]; srcName=a[5]; dstGUID=a[8]; dstName=a[9]
-            elseif (a[3] or ""):sub(1,8) ~= "Player-0" and (a[7] or ""):sub(1,8) == "Player-0" then
+            elseif sg3 ~= "" and roster[dg7] and not roster[sg3] then
                 srcGUID=a[3]; srcName=a[4]; dstGUID=a[7]; dstName=a[8]; spellPos=10
             else
                 return
@@ -1268,9 +1272,8 @@ EF:SetScript("OnEvent", function(self, event, ...)
             end
         end
 
-        -- ② NPC greift Gruppenmitglied an → Aggro-Tracking
-        local srcIsNPC = srcGUID and srcGUID:sub(1,8) ~= "Player-0"
-        if srcIsNPC and dstGUID and roster[dstGUID] then
+        -- ② NPC greift Gruppenmitglied an → Aggro-Tracking (src nicht im Roster = NPC)
+        if not roster[srcGUID] and srcGUID and dstGUID and roster[dstGUID] then
             if sub=="SWING_DAMAGE" or sub=="SWING_MISSED"
             or sub=="SPELL_DAMAGE" or sub=="SPELL_MISSED"
             or sub=="RANGE_DAMAGE" or sub=="RANGE_MISSED" then
