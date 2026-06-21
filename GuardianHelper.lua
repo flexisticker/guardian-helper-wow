@@ -487,6 +487,7 @@ MM:SetFrameStrata("MEDIUM")
 MM:SetFrameLevel(Minimap:GetFrameLevel() + 20)
 MM:SetMovable(true)
 MM:RegisterForDrag("LeftButton")
+MM:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 MM:EnableMouse(true)
 
 -- Dunkler BG
@@ -522,14 +523,19 @@ MM:SetScript("OnDragStart", function(self)
     end)
 end)
 MM:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
-MM:SetScript("OnClick", function()
-    if Frame:IsShown() then Frame:Hide() else Frame:Show() end
+MM:SetScript("OnClick", function(self, btn)
+    if btn == "RightButton" then
+        if CFG:IsShown() then CFG:Hide() else CFG:Show() end
+    else
+        if Frame:IsShown() then Frame:Hide() else Frame:Show() end
+    end
 end)
 MM:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:SetText("|cff14CCADGH|r |cff1AA8FFv"..VERSION.."|r")
-    GameTooltip:AddLine(IS_DE and "Klick: Ein/Ausblenden" or "Click: Toggle", 1,1,1)
-    GameTooltip:AddLine(IS_DE and "Drag: Verschieben"     or "Drag: Move",    0.6,0.6,0.7)
+    GameTooltip:AddLine(IS_DE and "Linksklick: Panel"     or "Left: Toggle Panel",    1,1,1)
+    GameTooltip:AddLine(IS_DE and "Rechtsklick: Konfig"   or "Right: Config",         1,0.82,0)
+    GameTooltip:AddLine(IS_DE and "Drag: Verschieben"     or "Drag: Move",            0.6,0.6,0.7)
     GameTooltip:Show()
 end)
 MM:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -611,7 +617,6 @@ local function MakeBtn(label, xOff, yOff, w2, onClick)
     return b
 end
 
-Sep(CFG, -96)
 
 -- ============================================================
 -- SOUND SELEKTOR (eingebettet in CFG)
@@ -710,14 +715,12 @@ local bindHint = CF(CFG, 6, DIM[1], DIM[2], DIM[3])
 bindHint:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -200)
 bindHint:SetText(IS_DE and "Tasten: ESC -> Tastenbel. -> Addons" or "Keys: ESC -> Bindings -> AddOns")
 
-CFG:SetHeight(220)
-local btnSave = MakeBtn(L.CFG_SAVE, 8, -148, 86, function()
+CFG:SetHeight(248)
+local btnSave = MakeBtn(L.CFG_SAVE, 8, -214, 86, function()
     print("|cff14CCADGuardianHelper:|r " .. L.MSG_SAVED)
     CFG:Hide()
 end)
-btnSave:SetPoint("BOTTOMLEFT",  CFG, "BOTTOMLEFT",  8, 6)
-local btnCancel = MakeBtn(L.CFG_CANCEL, 110, -148, 86, function() CFG:Hide() end)
-btnCancel:SetPoint("BOTTOMRIGHT", CFG, "BOTTOMRIGHT", -8, 6)
+local btnCancel = MakeBtn(L.CFG_CANCEL, 106, -214, 86, function() CFG:Hide() end)
 
 -- Refresh-Funktion für Sound-Button-Highlighting (wird nach DB-Load aufgerufen)
 function RefreshSoundBtns()
