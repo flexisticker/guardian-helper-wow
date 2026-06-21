@@ -912,8 +912,9 @@ local thBG = CT(TF,"BORDER",BG2[1],BG2[2],BG2[3],1)
 thBG:SetHeight(20); thBG:SetPoint("TOPLEFT",TF,"TOPLEFT",1,-1)
 thBG:SetPoint("TOPRIGHT",TF,"TOPRIGHT",-1,-1)
 
-CT(TF,"ARTWORK",ACCENT[1],ACCENT[2],ACCENT[3],1):SetSize(2,20)
-    :SetPoint("TOPLEFT",TF,"TOPLEFT",1,-1)   -- Teal Akzent-Linie
+local thAccent = CT(TF,"ARTWORK",ACCENT[1],ACCENT[2],ACCENT[3],1)
+thAccent:SetSize(2,20)
+thAccent:SetPoint("TOPLEFT",TF,"TOPLEFT",1,-1)
 
 local thTitle = CF(TF,9,ACCENT[1],ACCENT[2],ACCENT[3],true)
 thTitle:SetPoint("LEFT",TF,"TOPLEFT",8,-11)
