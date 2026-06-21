@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.9.5] - 2026-06-21
+
+### Fix
+- **Root-Cause CLEU Fix**: In TBC Anniversary 2.5.5 feuert `COMBAT_LOG_EVENT_UNFILTERED` mit leeren Varargs — `CombatLogGetCurrentEventInfo()` wird jetzt verwendet. Damit funktionieren **Auto-Angriff-Erkennung UND Aggro-Tracking** erstmals zuverlässig
+- Debug-Code vollständig entfernt (`/gh debug`, `GH_DEBUG` Variable, Debug-Prints)
+
+### Geändert
+- Version 4.9.5 / TOC 2.5.3
+
 ## [4.9.2-beta] - 2026-06-21
 
 ### Fix

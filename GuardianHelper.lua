@@ -2,7 +2,7 @@
 -- GuardianHelper v4.9.1 — Aggro Monitor + Config
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.9.3-dbg"
+local VERSION = "4.9.5"
 
 local DB
 local LOCALE = GetLocale()
@@ -1235,7 +1235,12 @@ EF:SetScript("OnEvent", function(self, event, ...)
         end
 
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
-        local a = {...}
+        local a
+        if CombatLogGetCurrentEventInfo then
+            a = {CombatLogGetCurrentEventInfo()}
+        else
+            a = {...}
+        end
         local sub = a[2]
         if not sub then return end
 
@@ -1248,17 +1253,6 @@ EF:SetScript("OnEvent", function(self, event, ...)
         local function isPlayer(g) return g and (g == pGUID or roster[g]) end
         local function isNPC(g)    return g and g ~= "" and not isPlayer(g) end
         local function looksLikeGUID(s) return type(s)=="string" and s:find("-",1,true) end
-
-        -- Debug: alle CLEU-Args dumpen die den Spieler betreffen
-        if GH_DEBUG and (sub=="SWING_DAMAGE" or sub=="SWING_MISSED" or sub=="SPELL_DAMAGE" or sub=="SPELL_MISSED") then
-            local hit = false
-            for i=1,12 do if tostring(a[i])==pGUID then hit=true; break end end
-            if hit then
-                local parts = {}
-                for i=1,12 do parts[i]="["..i.."]="..tostring(a[i]) end
-                print("|cffff9900GH-DBG|r "..sub..": "..table.concat(parts," "))
-            end
-        end
 
         if looksLikeGUID(a[4]) then
             srcGUID=a[4]; srcName=a[5]; dstGUID=a[8]; dstName=a[9]
@@ -1303,7 +1297,6 @@ end)
 -- ============================================================
 -- UPDATE LOOP
 -- ============================================================
-local GH_DEBUG  = false   -- /gh debug toggle
 local tick      = 0
 local threatTick = 0
 Frame:SetScript("OnUpdate", function(self, dt)
@@ -1493,13 +1486,6 @@ SlashCmdList["GH"] = function(msg)
     if msg == "lock" then
         if DB then DB.locked = not DB.locked end
         print("|cff14CCADGuardianHelper:|r " .. (DB and DB.locked and L.MSG_LOCKED or L.MSG_UNLOCKED))
-    elseif msg == "debug" then
-        GH_DEBUG = not GH_DEBUG
-        print("|cff14CCADGuardianHelper:|r Debug " .. (GH_DEBUG and "|cff00ff00AN|r" or "|cffff4444AUS|r"))
-        if GH_DEBUG then
-            print("  pGUID=" .. tostring(UnitGUID("player")))
-            print("  Roster-Einträge: " .. (function() local n=0; for _ in pairs(roster) do n=n+1 end; return n end)())
-        end
     elseif msg == "hide"  then Frame:Hide()
     elseif msg == "show"  then Frame:Show()
     elseif msg == "aggro" then
