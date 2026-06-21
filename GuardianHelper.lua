@@ -2,7 +2,7 @@
 -- GuardianHelper v4.9.1 — Aggro Monitor + Config
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.9.2"
+local VERSION = "4.9.3-dbg"
 
 local DB
 local LOCALE = GetLocale()
@@ -1249,24 +1249,23 @@ EF:SetScript("OnEvent", function(self, event, ...)
         local function isNPC(g)    return g and g ~= "" and not isPlayer(g) end
         local function looksLikeGUID(s) return type(s)=="string" and s:find("-",1,true) end
 
+        -- Debug: alle CLEU-Args dumpen die den Spieler betreffen
+        if GH_DEBUG and (sub=="SWING_DAMAGE" or sub=="SWING_MISSED" or sub=="SPELL_DAMAGE" or sub=="SPELL_MISSED") then
+            local hit = false
+            for i=1,12 do if tostring(a[i])==pGUID then hit=true; break end end
+            if hit then
+                local parts = {}
+                for i=1,12 do parts[i]="["..i.."]="..tostring(a[i]) end
+                print("|cffff9900GH-DBG|r "..sub..": "..table.concat(parts," "))
+            end
+        end
+
         if looksLikeGUID(a[4]) then
             srcGUID=a[4]; srcName=a[5]; dstGUID=a[8]; dstName=a[9]
         elseif looksLikeGUID(a[3]) then
             srcGUID=a[3]; srcName=a[4]; dstGUID=a[7]; dstName=a[8]; spellPos=10
         else
-            if GH_DEBUG then
-                print("|cffff4444GH-DBG|r kein GUID in a[3]/a[4]: sub="..tostring(sub)
-                    .." a[3]="..tostring(a[3]).." a[4]="..tostring(a[4]))
-            end
             return
-        end
-
-        if GH_DEBUG and (sub=="SWING_DAMAGE" or sub=="SWING_MISSED" or sub=="SPELL_DAMAGE" or sub=="SPELL_MISSED") then
-            print(string.format("|cff44ff44GH-DBG|r %s src=%s(%s) dst=%s(%s) isSrcNPC=%s isDstPlayer=%s",
-                sub,
-                tostring(srcName), tostring(srcGUID and srcGUID:sub(1,12)),
-                tostring(dstName), tostring(dstGUID and dstGUID:sub(1,12)),
-                tostring(isNPC(srcGUID)), tostring(isPlayer(dstGUID))))
         end
 
         if not isPlayer(srcGUID) and not isPlayer(dstGUID) then return end
