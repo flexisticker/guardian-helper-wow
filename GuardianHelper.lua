@@ -1,8 +1,8 @@
 -- ============================================================
--- GuardianHelper v4.2 — Lokalisierung DE/EN
+-- GuardianHelper v4.5 — Auto-Attack Indikator
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.2.0"
+local VERSION = "4.5.0"
 
 -- SavedVariables werden nach ADDON_LOADED initialisiert
 local DB
@@ -33,6 +33,10 @@ local L = {
     -- Debuffs
     FF_LABEL       = IS_DE and "FEF"     or "FF",
     DR_LABEL       = IS_DE and "Demo"    or "DR",
+    -- Auto-Attack
+    AA_ACTIVE      = IS_DE and "Auto-Angriff aktiv"  or "Auto-Attack active",
+    AA_OFF         = IS_DE and "!! AUTO AUS"          or "!! AUTO OFF",
+    AA_IDLE        = IS_DE and "-- kein Kampf"        or "-- no combat",
     -- Status
     READY          = IS_DE and "OK"      or "RDY",
     -- Footer
@@ -203,7 +207,7 @@ Sep(Frame, -46)
 -- MAUL INDICATOR
 -- ============================================================
 local mBG = CT(Frame, "ARTWORK", DKGREY[1], DKGREY[2], DKGREY[3], 1)
-mBG:SetHeight(15)
+mBG:SetHeight(28)
 mBG:SetPoint("TOPLEFT",  Frame, "TOPLEFT",  1, -48)
 mBG:SetPoint("TOPRIGHT", Frame, "TOPRIGHT", -1, -48)
 
@@ -215,40 +219,49 @@ local mTxt = CF(Frame, 8, GREY[1], GREY[2], GREY[3])
 mTxt:SetPoint("LEFT", Frame, "TOPLEFT", 16, -56)
 mTxt:SetText(L.MAUL_INACTIVE)
 
-Sep(Frame, -64)
+-- Auto-Attack Indikator (zweite Zeile im Maul-Block)
+local aaDot = CF(Frame, 7, GREY[1], GREY[2], GREY[3])
+aaDot:SetPoint("LEFT", Frame, "TOPLEFT", 7, -67)
+aaDot:SetText("-")
+
+local aaTxt = CF(Frame, 8, GREY[1], GREY[2], GREY[3])
+aaTxt:SetPoint("LEFT", Frame, "TOPLEFT", 16, -67)
+aaTxt:SetText(L.AA_IDLE)
+
+Sep(Frame, -77)
 
 -- ============================================================
 -- FF / DR ZEILE
 -- ============================================================
 local fDot = CF(Frame, 7, GREY[1], GREY[2], GREY[3])
-fDot:SetPoint("TOPLEFT", Frame, "TOPLEFT", 7, -72)
+fDot:SetPoint("TOPLEFT", Frame, "TOPLEFT", 7, -85)
 fDot:SetText("[*]")
 
 local fLbl = CF(Frame, 7, DGOLD[1], DGOLD[2], DGOLD[3])
-fLbl:SetPoint("TOPLEFT", Frame, "TOPLEFT", 16, -72)
+fLbl:SetPoint("TOPLEFT", Frame, "TOPLEFT", 16, -85)
 fLbl:SetText(L.FF_LABEL)
 
 local fVal = CF(Frame, 8, GREY[1], GREY[2], GREY[3])
-fVal:SetPoint("TOPLEFT", Frame, "TOPLEFT", 30, -72)
+fVal:SetPoint("TOPLEFT", Frame, "TOPLEFT", 30, -85)
 fVal:SetText("---")
 
 local vSep = CT(Frame, "ARTWORK", DGOLD[1], DGOLD[2], DGOLD[3], 0.4)
 vSep:SetSize(1, 10)
-vSep:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2, -68)
+vSep:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2, -81)
 
 local dDot = CF(Frame, 7, GREY[1], GREY[2], GREY[3])
-dDot:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2+5, -72)
+dDot:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2+5, -85)
 dDot:SetText("[*]")
 
 local dLbl = CF(Frame, 7, DGOLD[1], DGOLD[2], DGOLD[3])
-dLbl:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2+14, -72)
+dLbl:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2+14, -85)
 dLbl:SetText(L.DR_LABEL)
 
 local dVal = CF(Frame, 8, GREY[1], GREY[2], GREY[3])
-dVal:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2+28, -72)
+dVal:SetPoint("TOPLEFT", Frame, "TOPLEFT", W/2+28, -85)
 dVal:SetText("---")
 
-Sep(Frame, -79)
+Sep(Frame, -92)
 
 -- ============================================================
 -- COOLDOWN SLOTS
@@ -265,7 +278,7 @@ for i, key in ipairs(CD_ORDER) do
     -- SecureActionButtonTemplate: sicher in/ausserhalb Kampf, kein Taint
     local cf = CreateFrame("Button", "GHSlot"..i, Frame, "SecureActionButtonTemplate")
     cf:SetSize(CD_SZ, CD_SZ + 9)
-    cf:SetPoint("TOPLEFT", Frame, "TOPLEFT", xp, -82)
+    cf:SetPoint("TOPLEFT", Frame, "TOPLEFT", xp, -95)
     cf:RegisterForClicks("AnyUp")
     cf:SetAttribute("type1", "spell")
     cf:SetAttribute("spell", "")  -- wird bei PLAYER_LOGIN gesetzt
@@ -334,7 +347,7 @@ footer:SetPoint("BOTTOM", Frame, "BOTTOM", 0, 3)
 footer:SetText(L.FOOTER)
 
 -- Frame Höhe final
-Frame:SetHeight(82 + CD_SZ + 9 + 8)
+Frame:SetHeight(95 + CD_SZ + 9 + 8)
 
 -- ============================================================
 -- MINIMAP BUTTON
@@ -614,7 +627,8 @@ end
 -- ============================================================
 -- STATE
 -- ============================================================
-local maulQueued = false
+local maulQueued   = false
+local lastSwingTime = 0  -- GetTime() des letzten Auto-Angriffs (SWING_DAMAGE/MISSED)
 
 -- ============================================================
 -- EVENTS
@@ -624,6 +638,7 @@ EF:RegisterEvent("ADDON_LOADED")
 EF:RegisterEvent("PLAYER_LOGIN")
 EF:RegisterEvent("PLAYER_LEVEL_UP")
 EF:RegisterEvent("SPELLS_CHANGED")
+EF:RegisterEvent("PLAYER_REGEN_DISABLED")
 EF:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 
 EF:SetScript("OnEvent", function(self, event, ...)
@@ -675,10 +690,16 @@ EF:SetScript("OnEvent", function(self, event, ...)
     elseif event == "SPELLS_CHANGED" then
         BuildCache()
 
+    elseif event == "PLAYER_REGEN_DISABLED" then
+        -- Kampfbeginn: Swing-Timer zurücksetzen damit kein Sofort-Alarm
+        lastSwingTime = GetTime()
+
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
         local _, sub, _, guid, _, _, _, _, _, _, _, sid = ...
         if guid ~= UnitGUID("player") then return end
-        if sub == "SPELL_CAST_START" and MAUL_IDS[sid] then
+        if sub == "SWING_DAMAGE" or sub == "SWING_MISSED" then
+            lastSwingTime = GetTime()
+        elseif sub == "SPELL_CAST_START" and MAUL_IDS[sid] then
             maulQueued = true
         elseif (sub == "SPELL_DAMAGE" or sub == "SPELL_MISSED") and MAUL_IDS[sid] then
             maulQueued = false
@@ -736,6 +757,28 @@ Frame:SetScript("OnUpdate", function(self, dt)
         mDot:SetTextColor(GREY[1], GREY[2], GREY[3])
         mTxt:SetText(L.MAUL_INACTIVE)
         mTxt:SetTextColor(GREY[1], GREY[2], GREY[3])
+    end
+
+    -- Auto-Attack Indikator
+    local inCombat = UnitAffectingCombat("player")
+    if not inBear or not inCombat then
+        aaDot:SetTextColor(GREY[1], GREY[2], GREY[3])
+        aaTxt:SetText(L.AA_IDLE)
+        aaTxt:SetTextColor(GREY[1], GREY[2], GREY[3])
+    else
+        local aaSpeed = UnitAttackSpeed("player") or 2.0
+        local elapsed = GetTime() - lastSwingTime
+        if elapsed > (aaSpeed + 1.5) then
+            -- Auto-Attack steht still — rote Warnung
+            aaDot:SetTextColor(REDBR[1], REDBR[2], REDBR[3])
+            aaTxt:SetText(L.AA_OFF)
+            aaTxt:SetTextColor(REDBR[1], REDBR[2], REDBR[3])
+        else
+            -- Auto-Attack laeuft
+            aaDot:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
+            aaTxt:SetText(L.AA_ACTIVE)
+            aaTxt:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
+        end
     end
 
     -- Faerie Fire
