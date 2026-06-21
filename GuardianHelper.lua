@@ -67,6 +67,20 @@ local BUFF_DEFS = {
       ids={467,782,1075,8914,9756,9910,26992} },
 }
 
+-- Kuratierte Blizzard-Sounds (mit Preview-Funktion)
+local SOUNDS = {
+    { name="Alarm Kurz",   file="Sound\\Interface\\AlarmClockWarning1.ogg" },
+    { name="Alarm Mittel", file="Sound\\Interface\\AlarmClockWarning2.ogg" },
+    { name="Alarm Lang",   file="Sound\\Interface\\AlarmClockWarning3.ogg" },
+    { name="PvP Flagge",   file="Sound\\Spells\\PVPFlagTaken.ogg" },
+    { name="Murloc",       file="Sound\\Creature\\Murloc\\MurlocAggro.ogg" },
+    { name="Kampfschrei",  file="Sound\\Character\\Human\\Male\\HumanMaleBattleCry1.ogg" },
+}
+local function PlaySnd(idx)
+    local s = SOUNDS[idx or 1]
+    if s then PlaySoundFile(s.file, "SFX") end
+end
+
 -- ============================================================
 -- FARBEN — Modern Dark Gaming (Electric Blue + Teal)
 -- ============================================================
@@ -585,13 +599,6 @@ AddCheck(IS_DE and "Sound: Auto-Aus"     or "Sound: Auto-Off",    "soundAutoOff"
 AddCheck(IS_DE and "Nur in Kampf zeigen" or "Show in Combat only","combatOnly",   -80)
 Sep(CFG, -96)
 
-local opLbl = CF(CFG, 7, DIM[1], DIM[2], DIM[3])
-opLbl:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -104)
-opLbl:SetText(IS_DE and "Deckkraft:" or "Opacity:")
-local opVal = CF(CFG, 8, WHITE[1], WHITE[2], WHITE[3])
-opVal:SetPoint("TOPLEFT", CFG, "TOPLEFT", 68, -104)
-opVal:SetText("94%")
-
 local function MakeBtn(label, xOff, yOff, w2, onClick)
     local b = CreateFrame("Button", nil, CFG)
     b:SetSize(w2 or 32, 16)
@@ -604,25 +611,106 @@ local function MakeBtn(label, xOff, yOff, w2, onClick)
     return b
 end
 
-MakeBtn(" - ", 100, -100, 24, function()
+Sep(CFG, -96)
+
+-- ============================================================
+-- SOUND SELEKTOR (eingebettet in CFG)
+-- ============================================================
+-- Jeder Sound: kleiner nummerierter Button [1..6], Auswahl wird hervorgehoben.
+-- Hover = Tooltip mit Sound-Name. Klick = auswählen + sofort vorspielen.
+local SND_BTN_W = 26
+local SND_BTN_H = 14
+local SND_GAP   = 2
+local sndBtns_ao   = {}  -- Auto-Off Sound Buttons
+local sndBtns_buff = {}  -- Buff-Sound Buttons
+
+local function MakeSndBtn(parent, idx, x, y, tbl, dbKey)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(SND_BTN_W, SND_BTN_H)
+    b:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    local bg = CT(b, "BACKGROUND", DKBG[1], DKBG[2], DKBG[3], 1)
+    bg:SetAllPoints()
+    b.borderTex = CT(b, "BORDER", DIM[1], DIM[2], DIM[3], 0.5)
+    b.borderTex:SetAllPoints()
+    local lbl = CF(b, 7, DIM[1], DIM[2], DIM[3])
+    lbl:SetAllPoints(); lbl:SetJustifyH("CENTER"); lbl:SetText(tostring(idx))
+    b.numLbl = lbl
+    b:SetScript("OnClick", function()
+        if DB then DB[dbKey] = idx end
+        PlaySnd(idx)
+        -- Refresh aller Buttons in dieser Gruppe
+        for _, btn in ipairs(tbl) do
+            local sel = DB and DB[dbKey] == btn.idx
+            btn.borderTex:SetColorTexture(sel and BDR[1] or DIM[1], sel and BDR[2] or DIM[2], sel and BDR[3] or DIM[3], sel and 0.9 or 0.4)
+            btn.numLbl:SetTextColor(sel and WHITE[1] or DIM[1], sel and WHITE[2] or DIM[2], sel and WHITE[3] or DIM[3])
+        end
+    end)
+    b:SetScript("OnEnter", function(self)
+        local s = SOUNDS[idx]
+        if s then
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText(s.name, 1, 1, 1)
+            GameTooltip:AddLine(IS_DE and "Klick: Auswählen + Vorspielen" or "Click: Select + Preview", 0.6,0.6,0.7)
+            GameTooltip:Show()
+        end
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b.idx = idx
+    tbl[idx] = b
+    return b
+end
+
+-- Label + 6 Sound-Buttons für Auto-Off
+local aoLbl = CF(CFG, 7, DIM[1], DIM[2], DIM[3])
+aoLbl:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -104)
+aoLbl:SetText(IS_DE and "Auto-Off Sound:" or "Auto-Off Sound:")
+
+for i = 1, #SOUNDS do
+    local bx = 8 + (i-1) * (SND_BTN_W + SND_GAP)
+    MakeSndBtn(CFG, i, bx, -116, sndBtns_ao, "soundAutoOffIdx")
+end
+
+Sep(CFG, -133)
+
+-- Label + 6 Sound-Buttons für Buff-Warnung
+local buffLbl = CF(CFG, 7, DIM[1], DIM[2], DIM[3])
+buffLbl:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -141)
+buffLbl:SetText(IS_DE and "Buff-Warnung Sound:" or "Buff Warning Sound:")
+
+for i = 1, #SOUNDS do
+    local bx = 8 + (i-1) * (SND_BTN_W + SND_GAP)
+    MakeSndBtn(CFG, i, bx, -153, sndBtns_buff, "soundBuffIdx")
+end
+
+Sep(CFG, -170)
+
+-- Opacity
+local opLbl = CF(CFG, 7, DIM[1], DIM[2], DIM[3])
+opLbl:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -178)
+opLbl:SetText(IS_DE and "Deckkraft:" or "Opacity:")
+local opVal = CF(CFG, 8, WHITE[1], WHITE[2], WHITE[3])
+opVal:SetPoint("TOPLEFT", CFG, "TOPLEFT", 68, -178)
+opVal:SetText("94%")
+
+MakeBtn(" - ", 100, -174, 24, function()
     if not DB then return end
     DB.alpha = math.max(0.3, DB.alpha - 0.05)
     Frame:SetAlpha(DB.alpha)
     opVal:SetText(string.format("%d%%", DB.alpha * 100))
 end)
-MakeBtn(" + ", 128, -100, 24, function()
+MakeBtn(" + ", 128, -174, 24, function()
     if not DB then return end
     DB.alpha = math.min(1.0, DB.alpha + 0.05)
     Frame:SetAlpha(DB.alpha)
     opVal:SetText(string.format("%d%%", DB.alpha * 100))
 end)
 
-Sep(CFG, -122)
+Sep(CFG, -192)
 local bindHint = CF(CFG, 6, DIM[1], DIM[2], DIM[3])
-bindHint:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -130)
+bindHint:SetPoint("TOPLEFT", CFG, "TOPLEFT", 8, -200)
 bindHint:SetText(IS_DE and "Tasten: ESC -> Tastenbel. -> Addons" or "Keys: ESC -> Bindings -> AddOns")
 
-CFG:SetHeight(170)
+CFG:SetHeight(220)
 local btnSave = MakeBtn(L.CFG_SAVE, 8, -148, 86, function()
     print("|cff14CCADGuardianHelper:|r " .. L.MSG_SAVED)
     CFG:Hide()
@@ -630,6 +718,19 @@ end)
 btnSave:SetPoint("BOTTOMLEFT",  CFG, "BOTTOMLEFT",  8, 6)
 local btnCancel = MakeBtn(L.CFG_CANCEL, 110, -148, 86, function() CFG:Hide() end)
 btnCancel:SetPoint("BOTTOMRIGHT", CFG, "BOTTOMRIGHT", -8, 6)
+
+-- Refresh-Funktion für Sound-Button-Highlighting (wird nach DB-Load aufgerufen)
+function RefreshSoundBtns()
+    if not DB then return end
+    for _, tbl in ipairs({sndBtns_ao, sndBtns_buff}) do
+        local dbKey = tbl == sndBtns_ao and "soundAutoOffIdx" or "soundBuffIdx"
+        for _, btn in ipairs(tbl) do
+            local sel = DB[dbKey] == btn.idx
+            btn.borderTex:SetColorTexture(sel and BDR[1] or DIM[1], sel and BDR[2] or DIM[2], sel and BDR[3] or DIM[3], sel and 0.9 or 0.4)
+            btn.numLbl:SetTextColor(sel and WHITE[1] or DIM[1], sel and WHITE[2] or DIM[2], sel and WHITE[3] or DIM[3])
+        end
+    end
+end
 
 -- ============================================================
 -- SPELL CACHE
@@ -737,11 +838,11 @@ local aaWasOff      = false   -- Sound-Edge-Detection für Auto-Attack
 -- ============================================================
 -- SOUND HELPERS
 -- ============================================================
-local function PlayWarn()
-    PlaySoundFile("Sound\\Interface\\AlarmClockWarning2.ogg", "SFX")
+local function PlayWarn()   -- Auto-Angriff verloren
+    if DB and DB.soundAutoOff then PlaySnd(DB.soundAutoOffIdx or 2) end
 end
-local function PlayAlert()
-    PlaySoundFile("Sound\\Interface\\AlarmClockWarning1.ogg", "SFX")
+local function PlayAlert()  -- Buff fehlt beim Pull
+    if DB and DB.soundFormLoss then PlaySnd(DB.soundBuffIdx or 1) end
 end
 
 -- ============================================================
@@ -761,19 +862,21 @@ EF:SetScript("OnEvent", function(self, event, ...)
         DB = GuardianHelperDB
         DB.alpha        = DB.alpha or 0.94
         DB.locked       = DB.locked or false
-        DB.maulAlert    = DB.maulAlert    == nil and true  or DB.maulAlert
-        DB.soundFormLoss= DB.soundFormLoss == nil and true  or DB.soundFormLoss
-        DB.soundAutoOff = DB.soundAutoOff  == nil and true  or DB.soundAutoOff
+        DB.maulAlert       = DB.maulAlert       == nil and true or DB.maulAlert
+        DB.soundFormLoss   = DB.soundFormLoss   == nil and true or DB.soundFormLoss
+        DB.soundAutoOff    = DB.soundAutoOff    == nil and true or DB.soundAutoOff
+        DB.soundAutoOffIdx = DB.soundAutoOffIdx or 2
+        DB.soundBuffIdx    = DB.soundBuffIdx    or 1
         Frame:SetAlpha(DB.alpha)
         if DB.x and DB.y then
             Frame:ClearAllPoints()
             Frame:SetPoint("CENTER", UIParent, "CENTER", DB.x, DB.y)
         end
         opVal:SetText(string.format("%d%%", DB.alpha * 100))
-        -- Checkbox-States setzen
         for key, btn in pairs(cfgChecks) do
             btn.check:SetText(DB[key] and "v" or "")
         end
+        RefreshSoundBtns()
 
     elseif event == "PLAYER_LOGIN" then
         BuildCache()
@@ -816,13 +919,29 @@ EF:SetScript("OnEvent", function(self, event, ...)
         end
 
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
-        local _, sub, _, guid, _, _, _, _, _, _, _, sid = ...
-        if guid ~= UnitGUID("player") then return end
+        local a = {...}
+        local sub = a[2]
+        -- Nur relevante Sub-Events weiterverarbeiten
+        if sub ~= "SWING_DAMAGE" and sub ~= "SWING_MISSED"
+        and sub ~= "SPELL_CAST_START" and sub ~= "SPELL_DAMAGE" and sub ~= "SPELL_MISSED" then
+            return
+        end
+        -- Spieler-GUID dual-format: TBC mit hideCaster (pos4) ODER ohne (pos3)
+        local pGUID   = UnitGUID("player")
+        local spellPos = 12  -- Spell-ID Position mit hideCaster
+        local srcGUID  = a[4]
+        if srcGUID ~= pGUID then
+            srcGUID  = a[3]   -- Fallback ohne hideCaster
+            spellPos = 10
+            if srcGUID ~= pGUID then return end
+        end
+        -- Auto-Angriff Tracking
         if sub == "SWING_DAMAGE" or sub == "SWING_MISSED" then
             lastSwingTime = GetTime()
-        elseif sub == "SPELL_CAST_START" and MAUL_IDS[sid] then
+        -- Maul/Krallenhieb Queue
+        elseif sub == "SPELL_CAST_START" and MAUL_IDS[a[spellPos]] then
             maulQueued = true
-        elseif (sub == "SPELL_DAMAGE" or sub == "SPELL_MISSED") and MAUL_IDS[sid] then
+        elseif (sub == "SPELL_DAMAGE" or sub == "SPELL_MISSED") and MAUL_IDS[a[spellPos]] then
             maulQueued = false
         end
     end
