@@ -479,6 +479,7 @@ footer:SetText(L.FOOTER)
 Frame:SetHeight(122 + CD_SZ + 10 + 9)
 
 local CFG  -- forward declaration (wird weiter unten definiert)
+local TF   -- forward declaration (wird weiter unten definiert)
 
 -- ============================================================
 -- MINIMAP BUTTON
@@ -906,7 +907,7 @@ local TW     = 178
 local TR_H   = 15
 local MAX_TR = 8
 
-local TF = CreateFrame("Frame", "GHThreatFrame", UIParent)
+TF = CreateFrame("Frame", "GHThreatFrame", UIParent)
 TF:SetWidth(TW)
 TF:SetHeight(22 + MAX_TR * TR_H + 8)
 TF:SetPoint("CENTER", UIParent, "CENTER", 560, 0)
