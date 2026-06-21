@@ -794,31 +794,33 @@ local function InBearForm()
 end
 
 local function DebuffOnTarget(idList)
+    local idSet, nameSet = {}, {}
     for _, id in ipairs(idList) do
+        idSet[id] = true
         local n = GetSpellInfo(id)
-        if n then
-            for i = 1, 40 do
-                local dn, _, _, _, _, exp = UnitDebuff("target", i)
-                if not dn then break end
-                if dn == n then
-                    return exp and exp > 0 and (exp - GetTime()) or 999
-                end
-            end
+        if n then nameSet[n] = true end
+    end
+    for i = 1, 40 do
+        local dn, _, _, _, _, exp, _, _, _, sid = UnitDebuff("target", i)
+        if not dn then break end
+        if (sid and idSet[sid]) or nameSet[dn] then
+            return exp and exp > 0 and (exp - GetTime()) or 999
         end
     end
     return nil
 end
 
 local function HasBuff(idList)
+    local idSet, nameSet = {}, {}
     for _, id in ipairs(idList) do
+        idSet[id] = true
         local n = GetSpellInfo(id)
-        if n then
-            for i = 1, 40 do
-                local bn = UnitBuff("player", i)
-                if not bn then break end
-                if bn == n then return true end
-            end
-        end
+        if n then nameSet[n] = true end
+    end
+    for i = 1, 40 do
+        local bn, _, _, _, _, _, _, _, sid = UnitBuff("player", i)
+        if not bn then break end
+        if (sid and idSet[sid]) or nameSet[bn] then return true end
     end
     return false
 end
