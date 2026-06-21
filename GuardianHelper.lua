@@ -829,6 +829,230 @@ local function GetCD(key)
 end
 
 -- ============================================================
+-- AGGRO MONITOR — Daten & Roster
+-- ============================================================
+local CLASS_COLOR = {
+    WARRIOR={0.78,0.61,0.43}, PALADIN={0.96,0.55,0.73},
+    HUNTER ={0.67,0.83,0.45}, ROGUE  ={1.00,0.96,0.41},
+    PRIEST ={1.00,1.00,1.00}, SHAMAN ={0.00,0.44,0.87},
+    MAGE   ={0.25,0.78,0.92}, WARLOCK={0.53,0.53,0.93},
+    DRUID  ={1.00,0.49,0.04},
+}
+local HEALER_CLASSES = { PRIEST=true, DRUID=true, SHAMAN=true, PALADIN=true }
+local AGGRO_TTL      = 4.0   -- Sekunden bis Mob als disengaged gilt
+
+local roster      = {}  -- {[guid]={name,class,unitId}}
+local aggroData   = {}  -- {[pguid]={attackers={[mguid]={name,t}}, count=0}}
+local healerCache = {}  -- {[guid]=true} wenn Heilzauber gesehen
+
+local function RebuildRoster()
+    roster = {}
+    local function Add(uid)
+        if UnitExists(uid) then
+            local g = UnitGUID(uid)
+            if g then
+                local _, cls = UnitClass(uid)
+                roster[g] = { name=UnitName(uid) or "?", class=cls or "WARRIOR", unitId=uid }
+            end
+        end
+    end
+    Add("player")
+    for i=1,4  do Add("party"..i) end
+    for i=1,40 do Add("raid"..i)  end
+end
+
+local function RecordAttack(mobGUID, mobName, playerGUID)
+    if not roster[playerGUID] then return end
+    if not aggroData[playerGUID] then
+        aggroData[playerGUID] = { attackers={}, count=0 }
+    end
+    local e = aggroData[playerGUID]
+    if not e.attackers[mobGUID] then e.count = e.count + 1 end
+    e.attackers[mobGUID] = { name=mobName, t=GetTime() }
+end
+
+local function CleanAggro()
+    local now = GetTime()
+    for pguid, e in pairs(aggroData) do
+        for mguid, mob in pairs(e.attackers) do
+            if (now - mob.t) > AGGRO_TTL then
+                e.attackers[mguid] = nil
+                e.count = math.max(0, e.count - 1)
+            end
+        end
+        if e.count == 0 then aggroData[pguid] = nil end
+    end
+end
+
+-- ============================================================
+-- AGGRO MONITOR — Frame (TF)
+-- ============================================================
+local TW     = 178
+local TR_H   = 15
+local MAX_TR = 8
+
+local TF = CreateFrame("Frame", "GHThreatFrame", UIParent)
+TF:SetWidth(TW)
+TF:SetHeight(22 + MAX_TR * TR_H + 8)
+TF:SetPoint("CENTER", UIParent, "CENTER", 560, 0)
+TF:SetMovable(true); TF:EnableMouse(true); TF:RegisterForDrag("LeftButton")
+TF:SetScript("OnDragStart", function(s)
+    if not (DB and DB.locked) then s:StartMoving() end
+end)
+TF:SetScript("OnDragStop", function(s)
+    s:StopMovingOrSizing()
+    if DB then local _,_,_,x,y=s:GetPoint(); DB.tx=x; DB.ty=y end
+end)
+TF:SetFrameStrata("MEDIUM"); TF:SetClampedToScreen(true)
+
+CT(TF,"BACKGROUND",BG[1],BG[2],BG[3],BG[4]):SetAllPoints()
+AddBorder(TF, BDR[1], BDR[2], BDR[3], 0.8, 1)
+
+local thBG = CT(TF,"BORDER",BG2[1],BG2[2],BG2[3],1)
+thBG:SetHeight(20); thBG:SetPoint("TOPLEFT",TF,"TOPLEFT",1,-1)
+thBG:SetPoint("TOPRIGHT",TF,"TOPRIGHT",-1,-1)
+
+CT(TF,"ARTWORK",ACCENT[1],ACCENT[2],ACCENT[3],1):SetSize(2,20)
+    :SetPoint("TOPLEFT",TF,"TOPLEFT",1,-1)   -- Teal Akzent-Linie
+
+local thTitle = CF(TF,9,ACCENT[1],ACCENT[2],ACCENT[3],true)
+thTitle:SetPoint("LEFT",TF,"TOPLEFT",8,-11)
+thTitle:SetText(IS_DE and "AGGRO MONITOR" or "AGGRO MONITOR")
+
+local thInfo = CF(TF,7,DIM[1],DIM[2],DIM[3])
+thInfo:SetPoint("RIGHT",TF,"TOPRIGHT",-6,-11)
+thInfo:SetText("")
+
+Sep(TF, -21)
+
+-- Zeilenspalten-Header
+local colHdr = CF(TF,6,DIM[1],DIM[2],DIM[3])
+colHdr:SetPoint("TOPLEFT",TF,"TOPLEFT",20,-20)
+colHdr:SetText(IS_DE and "Spieler" or "Player")
+local colHdr2 = CF(TF,6,DIM[1],DIM[2],DIM[3])
+colHdr2:SetPoint("TOPRIGHT",TF,"TOPRIGHT",-5,-20)
+colHdr2:SetText(IS_DE and "Mobs" or "Mobs")
+
+-- Dynamische Zeilen (SecureActionButtonTemplate für Click-to-Target im Kampf)
+local tRows = {}
+for i = 1, MAX_TR do
+    local y = -23 - (i-1) * TR_H
+    local row = CreateFrame("Button","GHTRow"..i,TF,"SecureActionButtonTemplate")
+    row:SetSize(TW-2, TR_H)
+    row:SetPoint("TOPLEFT",TF,"TOPLEFT",1,y)
+    row:RegisterForClicks("AnyUp")
+    row:SetAttribute("type","target")
+    row:SetAttribute("unit","")
+
+    -- Zeilen-BG (wird je nach Status gefärbt)
+    local rbg = CT(row,"BACKGROUND",0,0,0,0); rbg:SetAllPoints(); row.bg=rbg
+
+    -- Klassen-Farb-Streifen (3px links)
+    local rclr = CT(row,"ARTWORK",0.5,0.5,0.5,0)
+    rclr:SetWidth(3)
+    rclr:SetPoint("TOPLEFT",row,"TOPLEFT",0,0)
+    rclr:SetPoint("BOTTOMLEFT",row,"BOTTOMLEFT",0,0)
+    row.clr = rclr
+
+    -- Heiler-Badge
+    local rh = CF(row,6,RED[1],0.3,0.3)
+    rh:SetPoint("LEFT",row,"LEFT",5,0); rh:SetText(""); row.hbadge=rh
+
+    -- Spieler-Name
+    local rname = CF(row,8,WHITE[1],WHITE[2],WHITE[3])
+    rname:SetPoint("LEFT",row,"LEFT",16,0); rname:SetText(""); row.nameL=rname
+
+    -- Mob-Anzahl (rechts)
+    local rcnt = CF(row,9,ORANGE[1],ORANGE[2],ORANGE[3])
+    rcnt:SetPoint("RIGHT",row,"RIGHT",-5,0); rcnt:SetText(""); row.cntL=rcnt
+
+    row:SetScript("OnEnter",function(self)
+        if self.mobs and #self.mobs > 0 then
+            GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
+            GameTooltip:SetText(self.nameL:GetText(),1,1,1)
+            for _,mn in ipairs(self.mobs) do
+                GameTooltip:AddLine("  "..mn, ORANGE[1],ORANGE[2],ORANGE[3])
+            end
+            GameTooltip:AddLine(
+                IS_DE and "\nKlick: Ziel anwählen" or "\nClick: Target their mob",
+                0.5,0.5,0.6)
+            GameTooltip:Show()
+        end
+    end)
+    row:SetScript("OnLeave",function() GameTooltip:Hide() end)
+    row:Hide(); row.mobs={}
+    tRows[i]=row
+end
+
+-- Leer-Hinweis
+local tEmpty = CF(TF,7,DIM[1],DIM[2],DIM[3])
+tEmpty:SetPoint("CENTER",TF,"CENTER",0,-10)
+tEmpty:SetText(IS_DE and "keine Aggro erkannt" or "no aggro detected")
+
+TF:Hide()
+
+-- Update-Funktion für den Aggro-Monitor
+local function UpdateThreatUI()
+    CleanAggro()
+    local list = {}
+    for pguid, e in pairs(aggroData) do
+        local p = roster[pguid]
+        if p and e.count > 0 then
+            local mbs = {}
+            for _, mob in pairs(e.attackers) do table.insert(mbs, mob.name) end
+            table.insert(list, {
+                name    = p.name, class = p.class, unitId = p.unitId,
+                count   = e.count, mobs = mbs,
+                isHealer= HEALER_CLASSES[p.class] or healerCache[pguid] or false,
+            })
+        end
+    end
+    table.sort(list, function(a,b) return a.count > b.count end)
+
+    local n = #list
+    thInfo:SetText(n > 0 and n.." ".. (IS_DE and "Spieler" or "player") or "")
+    tEmpty:SetShown(n == 0)
+
+    for i = 1, MAX_TR do
+        local row = tRows[i]
+        local d   = list[i]
+        if d then
+            row:Show()
+            local cc = CLASS_COLOR[d.class] or {0.7,0.7,0.7}
+            row.clr:SetColorTexture(cc[1],cc[2],cc[3],1)
+            if d.isHealer then
+                row.bg:SetColorTexture(0.25,0.03,0.03,0.75)
+                row.hbadge:SetText("[H]")
+                row.nameL:SetTextColor(1.0,0.45,0.45)
+            else
+                row.bg:SetColorTexture(BG2[1],BG2[2],BG2[3],0.5)
+                row.hbadge:SetText("")
+                row.nameL:SetTextColor(WHITE[1],WHITE[2],WHITE[3])
+            end
+            local nm = d.name; if #nm>12 then nm=nm:sub(1,11)..".." end
+            row.nameL:SetText(nm)
+            local cc2 = d.count>=3 and RED or (d.count==2 and ORANGE or WHITE)
+            row.cntL:SetText(d.count.."x")
+            row.cntL:SetTextColor(cc2[1],cc2[2],cc2[3])
+            row.mobs = d.mobs
+            -- Secure target: außerhalb Kampf setzbar
+            if not InCombatLockdown() then
+                local uid = d.unitId
+                if uid == "player" then
+                    row:SetAttribute("unit","target")
+                else
+                    row:SetAttribute("unit", uid.."target")
+                end
+            end
+        else
+            row:Hide()
+        end
+    end
+    local rows = math.max(1, math.min(n, MAX_TR))
+    TF:SetHeight(22 + rows * TR_H + 8)
+end
+
+-- ============================================================
 -- STATE
 -- ============================================================
 local maulQueued    = false
@@ -854,6 +1078,10 @@ EF:RegisterEvent("PLAYER_LOGIN")
 EF:RegisterEvent("PLAYER_LEVEL_UP")
 EF:RegisterEvent("SPELLS_CHANGED")
 EF:RegisterEvent("PLAYER_REGEN_DISABLED")
+EF:RegisterEvent("PLAYER_REGEN_ENABLED")
+EF:RegisterEvent("PARTY_MEMBERS_CHANGED")
+EF:RegisterEvent("RAID_ROSTER_UPDATE")
+EF:RegisterEvent("PLAYER_ENTERING_WORLD")
 EF:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
 
 EF:SetScript("OnEvent", function(self, event, ...)
@@ -867,19 +1095,40 @@ EF:SetScript("OnEvent", function(self, event, ...)
         DB.soundAutoOff    = DB.soundAutoOff    == nil and true or DB.soundAutoOff
         DB.soundAutoOffIdx = DB.soundAutoOffIdx or 2
         DB.soundBuffIdx    = DB.soundBuffIdx    or 1
+        DB.showAggro       = DB.showAggro       == nil and true or DB.showAggro
         Frame:SetAlpha(DB.alpha)
         if DB.x and DB.y then
             Frame:ClearAllPoints()
             Frame:SetPoint("CENTER", UIParent, "CENTER", DB.x, DB.y)
         end
+        if DB.tx and DB.ty then
+            TF:ClearAllPoints()
+            TF:SetPoint("CENTER", UIParent, "CENTER", DB.tx, DB.ty)
+        end
+        if DB.showAggro then TF:Show() else TF:Hide() end
         opVal:SetText(string.format("%d%%", DB.alpha * 100))
         for key, btn in pairs(cfgChecks) do
             btn.check:SetText(DB[key] and "v" or "")
         end
         RefreshSoundBtns()
 
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        RebuildRoster()
+
+    elseif event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+        RebuildRoster()
+        aggroData   = {}  -- Alte Daten löschen nach Roster-Änderung
+        healerCache = {}
+
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        -- Kampf beendet: Aggro-Daten zurücksetzen
+        aggroData   = {}
+        healerCache = {}
+        UpdateThreatUI()
+
     elseif event == "PLAYER_LOGIN" then
         BuildCache()
+        RebuildRoster()
         for _, f in ipairs(cdSlots) do
             local c = cache[f.key]
             if c and c.name then f:SetAttribute("spell", c.name); f.spellName = c.name end
@@ -921,28 +1170,56 @@ EF:SetScript("OnEvent", function(self, event, ...)
     elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
         local a = {...}
         local sub = a[2]
-        -- Nur relevante Sub-Events weiterverarbeiten
-        if sub ~= "SWING_DAMAGE" and sub ~= "SWING_MISSED"
-        and sub ~= "SPELL_CAST_START" and sub ~= "SPELL_DAMAGE" and sub ~= "SPELL_MISSED" then
-            return
-        end
-        -- Spieler-GUID dual-format: TBC mit hideCaster (pos4) ODER ohne (pos3)
-        local pGUID   = UnitGUID("player")
-        local spellPos = 12  -- Spell-ID Position mit hideCaster
+        if not sub then return end
+
+        -- Dual-Format GUID-Erkennung (mit/ohne hideCaster)
+        local pGUID    = UnitGUID("player")
+        local spellPos = 12
         local srcGUID  = a[4]
-        if srcGUID ~= pGUID then
-            srcGUID  = a[3]   -- Fallback ohne hideCaster
-            spellPos = 10
-            if srcGUID ~= pGUID then return end
+        local srcName  = a[5]
+        local dstGUID, dstName
+        if srcGUID == pGUID or (roster[srcGUID] and srcGUID:sub(1,6)=="Player") then
+            dstGUID = a[8]; dstName = a[9]
+        elseif a[3] == pGUID or (roster[a[3]] and (a[3] or ""):sub(1,6)=="Player") then
+            srcGUID=a[3]; srcName=a[4]; dstGUID=a[7]; dstName=a[8]; spellPos=10
+        else
+            -- Prüfe ob Source ein NPC ist der einen Spieler angreift
+            -- NPC-GUIDs starten mit "Creature-" oder ähnlich (nicht "Player-")
+            local sg = a[4] or ""
+            local dg = a[8] or ""
+            if sg:sub(1,8) ~= "Player-0" and dg:sub(1,8) == "Player-0" then
+                srcGUID=a[4]; srcName=a[5]; dstGUID=a[8]; dstName=a[9]
+            elseif (a[3] or ""):sub(1,8) ~= "Player-0" and (a[7] or ""):sub(1,8) == "Player-0" then
+                srcGUID=a[3]; srcName=a[4]; dstGUID=a[7]; dstName=a[8]; spellPos=10
+            else
+                return
+            end
         end
-        -- Auto-Angriff Tracking
-        if sub == "SWING_DAMAGE" or sub == "SWING_MISSED" then
-            lastSwingTime = GetTime()
-        -- Maul/Krallenhieb Queue
-        elseif sub == "SPELL_CAST_START" and MAUL_IDS[a[spellPos]] then
-            maulQueued = true
-        elseif (sub == "SPELL_DAMAGE" or sub == "SPELL_MISSED") and MAUL_IDS[a[spellPos]] then
-            maulQueued = false
+
+        -- ① Auto-Angriff + Maul Tracking (eigener Spieler)
+        if srcGUID == pGUID then
+            if sub == "SWING_DAMAGE" or sub == "SWING_MISSED" then
+                lastSwingTime = GetTime()
+            elseif sub == "SPELL_CAST_START" and MAUL_IDS[a[spellPos]] then
+                maulQueued = true
+            elseif (sub == "SPELL_DAMAGE" or sub == "SPELL_MISSED") and MAUL_IDS[a[spellPos]] then
+                maulQueued = false
+            end
+        end
+
+        -- ② NPC greift Gruppenmitglied an → Aggro-Tracking
+        local srcIsNPC = srcGUID and srcGUID:sub(1,8) ~= "Player-0"
+        if srcIsNPC and dstGUID and roster[dstGUID] then
+            if sub=="SWING_DAMAGE" or sub=="SWING_MISSED"
+            or sub=="SPELL_DAMAGE" or sub=="SPELL_MISSED"
+            or sub=="RANGE_DAMAGE" or sub=="RANGE_MISSED" then
+                RecordAttack(srcGUID, srcName or "?", dstGUID)
+            end
+        end
+
+        -- ③ Heiler erkennen: Spieler aus Gruppe castet Heilzauber
+        if sub == "SPELL_HEAL" and srcGUID and roster[srcGUID] then
+            healerCache[srcGUID] = true
         end
     end
 end)
@@ -950,11 +1227,19 @@ end)
 -- ============================================================
 -- UPDATE LOOP
 -- ============================================================
-local tick = 0
+local tick      = 0
+local threatTick = 0
 Frame:SetScript("OnUpdate", function(self, dt)
     tick = tick + dt
     if tick < 0.15 then return end
     tick = 0
+
+    -- Aggro-Monitor (alle 0.5s, nur wenn Frame sichtbar)
+    threatTick = threatTick + 0.15
+    if threatTick >= 0.5 and TF:IsShown() then
+        threatTick = 0
+        UpdateThreatUI()
+    end
 
     -- === Rage ===
     local rage    = UnitPower("player", 1)
@@ -1133,6 +1418,9 @@ SlashCmdList["GH"] = function(msg)
         print("|cff14CCADGuardianHelper:|r " .. (DB and DB.locked and L.MSG_LOCKED or L.MSG_UNLOCKED))
     elseif msg == "hide"  then Frame:Hide()
     elseif msg == "show"  then Frame:Show()
+    elseif msg == "aggro" then
+        if TF:IsShown() then TF:Hide(); if DB then DB.showAggro=false end
+        else TF:Show(); if DB then DB.showAggro=true end end
     elseif msg == "config" or msg == "cfg" then
         if CFG:IsShown() then CFG:Hide() else CFG:Show() end
     elseif msg == "reset" then
@@ -1154,6 +1442,6 @@ SlashCmdList["GH"] = function(msg)
         end
     else
         print("|cff14CCADGuardianHelper|r |cff1AA8FFv"..VERSION.."|r")
-        print("  /gh lock  hide  show  reset  update  status  config")
+        print("  /gh lock  hide  show  reset  update  status  config  aggro")
     end
 end
