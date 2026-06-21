@@ -2,7 +2,7 @@
 -- GuardianHelper v4.9.1 — Aggro Monitor + Config
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.9.7"
+local VERSION = "4.9.8"
 
 local DB
 local LOCALE = GetLocale()
@@ -705,19 +705,20 @@ MakeBtn(" - ", 100, -190, 24, function()
     if not DB then return end
     DB.alpha = math.max(0.3, DB.alpha - 0.05)
     Frame:SetAlpha(DB.alpha)
-    TF:SetAlpha(DB.alpha)
+    if TF then TF:SetAlpha(DB.alpha) end
     opVal:SetText(string.format("%d%%", DB.alpha * 100))
 end)
 MakeBtn(" + ", 128, -190, 24, function()
     if not DB then return end
     DB.alpha = math.min(1.0, DB.alpha + 0.05)
     Frame:SetAlpha(DB.alpha)
-    TF:SetAlpha(DB.alpha)
+    if TF then TF:SetAlpha(DB.alpha) end
     opVal:SetText(string.format("%d%%", DB.alpha * 100))
 end)
 
 -- Aggro Monitor Reset-Position Button
 MakeBtn(IS_DE and "Aggro Pos. reset" or "Aggro Pos. reset", 8, -207, 130, function()
+    if not TF then return end
     TF:ClearAllPoints()
     TF:SetPoint("CENTER", UIParent, "CENTER", 560, 0)
     if DB then DB.tx = nil; DB.ty = nil end

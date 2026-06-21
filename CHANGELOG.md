@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.9.8] - 2026-06-21
+
+### Fix
+- **Lua-Fehler TF nil**: Nil-Guards für alle TF-Zugriffe in Config-Panel-Buttons (`if TF then ... end`) — Config-Panel-Closures werden vor TF-Erstellung definiert
+
+### Geändert
+- Version 4.9.8 / TOC 2.5.6
+
 ## [4.9.7] - 2026-06-21
 
 ### Fix
