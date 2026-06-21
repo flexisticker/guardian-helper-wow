@@ -73,6 +73,14 @@ local SPELL_GROUPS = {
 }
 local CD_ORDER  = { "BASH","GROWL","ENRAGE","FRENZIED_REGEN","BARKSKIN","MANGLE_BEAR","LACERATE" }
 local MAUL_IDS  = {[6807]=true,[8972]=true,[9745]=true,[9880]=true,[9881]=true,[26996]=true,[26997]=true}
+
+-- Buff-Checks: level-basiert, alle Ränge pro Buff
+local BUFF_DEFS = {
+    { key="MOTW",   label=IS_DE and "MotW"   or "MotW",   minLevel=1,
+      ids={1126,5232,6756,5234,8907,9884,9885,26990} },
+    { key="THORNS", label=IS_DE and "Dornen" or "Thorns", minLevel=6,
+      ids={467,782,1075,8914,9756,9910,26992} },
+}
 local BEAR_IDS  = {5487, 9634}   -- Bear Form, Dire Bear Form
 local FF_IDS    = {16857,17390,17391,17392,27011}
 local DR_IDS    = {99,1735,9490,9747,9898,26998}
@@ -264,6 +272,34 @@ dVal:SetText("---")
 Sep(Frame, -92)
 
 -- ============================================================
+-- BUFF CHECK ZEILE
+-- ============================================================
+local buffRowBG = CT(Frame, "ARTWORK", DKGREY[1], DKGREY[2], DKGREY[3], 1)
+buffRowBG:SetHeight(14)
+buffRowBG:SetPoint("TOPLEFT",  Frame, "TOPLEFT",  1, -93)
+buffRowBG:SetPoint("TOPRIGHT", Frame, "TOPRIGHT", -1, -93)
+
+-- Buff-Label links
+local buffHdr = CF(Frame, 6, DGOLD[1], DGOLD[2], DGOLD[3])
+buffHdr:SetPoint("LEFT", Frame, "TOPLEFT", 7, -100)
+buffHdr:SetText(IS_DE and "BUFFS" or "BUFFS")
+
+-- Buff-Slots: je ein Dot + Label, dynamisch platziert
+local buffSlots = {}
+local bxStart = 38
+local bxStep  = (W - bxStart - 8) / math.max(#BUFF_DEFS, 1)
+for i, def in ipairs(BUFF_DEFS) do
+    local bx = bxStart + (i - 1) * bxStep
+    local dot = CF(Frame, 7, GREY[1], GREY[2], GREY[3])
+    dot:SetPoint("LEFT", Frame, "TOPLEFT", bx, -100)
+    dot:SetText("[?]")
+    local lbl = CF(Frame, 7, GREY[1], GREY[2], GREY[3])
+    lbl:SetPoint("LEFT", Frame, "TOPLEFT", bx + 16, -100)
+    lbl:SetText(def.label)
+    buffSlots[i] = { dot=dot, lbl=lbl, def=def }
+end
+
+-- ============================================================
 -- COOLDOWN SLOTS
 -- ============================================================
 local CD_SZ  = 26
@@ -278,7 +314,7 @@ for i, key in ipairs(CD_ORDER) do
     -- SecureActionButtonTemplate: sicher in/ausserhalb Kampf, kein Taint
     local cf = CreateFrame("Button", "GHSlot"..i, Frame, "SecureActionButtonTemplate")
     cf:SetSize(CD_SZ, CD_SZ + 9)
-    cf:SetPoint("TOPLEFT", Frame, "TOPLEFT", xp, -95)
+    cf:SetPoint("TOPLEFT", Frame, "TOPLEFT", xp, -109)
     cf:RegisterForClicks("AnyUp")
     cf:SetAttribute("type1", "spell")
     cf:SetAttribute("spell", "")  -- wird bei PLAYER_LOGIN gesetzt
@@ -347,7 +383,7 @@ footer:SetPoint("BOTTOM", Frame, "BOTTOM", 0, 3)
 footer:SetText(L.FOOTER)
 
 -- Frame Höhe final
-Frame:SetHeight(95 + CD_SZ + 9 + 8)
+Frame:SetHeight(109 + CD_SZ + 9 + 8)
 
 -- ============================================================
 -- MINIMAP BUTTON
@@ -605,7 +641,7 @@ local function DebuffOnTarget(idList)
         local n = GetSpellInfo(id)
         if n then
             for i = 1, 40 do
-                local dn, _, _, _, _, _, exp = UnitDebuff("target", i)
+                local dn, _, _, _, _, exp = UnitDebuff("target", i)
                 if not dn then break end
                 if dn == n then
                     return exp and exp > 0 and (exp - GetTime()) or 999
@@ -614,6 +650,20 @@ local function DebuffOnTarget(idList)
         end
     end
     return nil
+end
+
+local function HasBuff(idList)
+    for _, id in ipairs(idList) do
+        local n = GetSpellInfo(id)
+        if n then
+            for i = 1, 40 do
+                local bn = UnitBuff("player", i)
+                if not bn then break end
+                if bn == n then return true end
+            end
+        end
+    end
+    return false
 end
 
 local function GetCD(key)
@@ -815,6 +865,25 @@ Frame:SetScript("OnUpdate", function(self, dt)
     else
         dDot:SetTextColor(GREY[1], GREY[2], GREY[3])
         dVal:SetText("---"); dVal:SetTextColor(GREY[1], GREY[2], GREY[3])
+    end
+
+    -- Buff-Checker
+    local playerLevel = UnitLevel("player")
+    for _, bs in ipairs(buffSlots) do
+        if playerLevel >= bs.def.minLevel then
+            if HasBuff(bs.def.ids) then
+                bs.dot:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
+                bs.dot:SetText("[o]")
+                bs.lbl:SetTextColor(GREEN[1], GREEN[2], GREEN[3])
+            else
+                bs.dot:SetTextColor(REDBR[1], REDBR[2], REDBR[3])
+                bs.dot:SetText("[!]")
+                bs.lbl:SetTextColor(REDBR[1], REDBR[2], REDBR[3])
+            end
+            bs.dot:Show(); bs.lbl:Show()
+        else
+            bs.dot:Hide(); bs.lbl:Hide()
+        end
     end
 
     -- Cooldowns
