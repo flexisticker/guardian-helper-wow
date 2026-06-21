@@ -478,6 +478,8 @@ footer:SetText(L.FOOTER)
 -- Frame Höhe final
 Frame:SetHeight(122 + CD_SZ + 10 + 9)
 
+local CFG  -- forward declaration (wird weiter unten definiert)
+
 -- ============================================================
 -- MINIMAP BUTTON
 -- ============================================================
@@ -543,7 +545,7 @@ MM:SetScript("OnLeave", function() GameTooltip:Hide() end)
 -- ============================================================
 -- CONFIG PANEL
 -- ============================================================
-local CFG = CreateFrame("Frame", "GHConfigFrame", UIParent)
+CFG = CreateFrame("Frame", "GHConfigFrame", UIParent)
 CFG:SetSize(200, 160)
 CFG:SetPoint("CENTER", UIParent, "CENTER", 50, 50)
 CFG:SetFrameStrata("HIGH")
