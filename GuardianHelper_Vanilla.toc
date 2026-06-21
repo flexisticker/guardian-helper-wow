@@ -3,7 +3,7 @@
 ## Notes: Guardian Druid Tank Assistant — Classic Era & Hardcore
 ## Notes-deDE: Baeren-Druide Tank Assistent — Classic Era & Hardcore
 ## Author: flexisticker
-## Version: 2.2.0
+## Version: 2.3.0
 ## DefaultState: Enabled
 ## X-Curse-Project-ID: 1567398
 ## X-GitHub: https://github.com/flexisticker/guardian-helper-wow

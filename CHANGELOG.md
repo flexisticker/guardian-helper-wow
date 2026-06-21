@@ -1,5 +1,24 @@
 # Changelog
 
+## [4.6.0-beta] - 2026-06-21
+
+### Neu — Modern Gaming UI Redesign
+- **Electric-Blue Theme**: Dunkles Blau-Schwarz BG mit Electric-Blue Rahmen + Teal Akzent
+- **WoW StatusBar** fuer Rage-Anzeige (natives Widget, glatter als Custom-Textur)
+- **Spell-Icons fuer Buff-Checker**: Zeigt echte 22x22 Ingame-Icons fuer MotW/Dornen
+  - Gruener Rahmen + kein Overlay = Buff aktiv
+  - Roter Rahmen + rotes Overlay = Buff fehlt
+- **Sound-Alerts** (einstellbar per /gh config):
+  - `AlarmClockWarning2.ogg` wenn Auto-Angriff im Kampf einschlaeft
+  - `AlarmClockWarning1.ogg` beim Pull-Start wenn ein Buff fehlt
+  - Edge-Detection: Sound nur einmal wenn Zustand wechselt, nicht jeden Tick
+- **Bear-Icon im Header** (GetSpellTexture des Bear Form Spells)
+- **Spell-Icons fuer FF/Demo Roar** Zeile (10x10 Icons neben Labels)
+- MORPHEUS.TTF fuer Header-Texte (WoW Gaming-Schrift)
+- Config-Panel: 2 neue Checkboxen fuer Sound-Einstellungen
+- Cooldowns auf CD zeigen Electric-Blue Rahmen statt Gold
+- Version 4.6.0 / TOC 2.3.0
+
 ## [4.5.0-beta] - 2026-06-21
 
 ### Neu
