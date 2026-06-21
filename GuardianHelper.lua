@@ -2,7 +2,7 @@
 -- GuardianHelper v4.9.1 — Aggro Monitor + Config
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.9.1"
+local VERSION = "4.9.2"
 
 local DB
 local LOCALE = GetLocale()
@@ -878,7 +878,12 @@ local function RebuildRoster()
 end
 
 local function RecordAttack(mobGUID, mobName, playerGUID)
-    if not roster[playerGUID] then return end
+    if not roster[playerGUID] and playerGUID ~= UnitGUID("player") then return end
+    -- Spieler sicherstellen dass er im Roster ist (Fallback)
+    if not roster[playerGUID] then
+        local _, cls = UnitClass("player")
+        roster[playerGUID] = { name=UnitName("player") or "?", class=cls or "DRUID", unitId="player" }
+    end
     if not aggroData[playerGUID] then
         aggroData[playerGUID] = { attackers={}, count=0 }
     end
@@ -1240,29 +1245,29 @@ EF:SetScript("OnEvent", function(self, event, ...)
         local srcGUID  = a[4]
         local srcName  = a[5]
         local dstGUID, dstName
-        -- Format A (mit hideCaster): pos3=hideCaster, pos4=srcGUID, pos8=dstGUID
-        -- Format B (ohne hideCaster): pos3=srcGUID, pos7=dstGUID
-        -- Wir erkennen das Format anhand ob pos4 im Roster oder == pGUID ist
-        local isFormatA = (a[4] == pGUID or roster[a[4]])
-        local isFormatB = (a[3] == pGUID or roster[a[3]])
-        if isFormatA then
-            dstGUID = a[8]; dstName = a[9]
-        elseif isFormatB then
+        -- Hilfsfunktion: ist ein GUID ein bekannter Spieler (Roster oder eigener Char)?
+        local function isPlayer(g) return g and (g == pGUID or roster[g]) end
+        local function isNPC(g)    return g and g ~= "" and not isPlayer(g) end
+
+        -- Format A (mit hideCaster): a[3]=bool, a[4]=srcGUID, a[8]=dstGUID
+        -- Format B (ohne hideCaster): a[3]=srcGUID, a[4]=srcName, a[7]=dstGUID
+        -- Strategie: probiere Format A zuerst (srcGUID an Pos 4 erkennbar als GUID-String)
+        local function looksLikeGUID(s) return type(s)=="string" and s:find("-",1,true) end
+
+        if looksLikeGUID(a[4]) then
+            -- Format A: a[4]=srcGUID, a[8]=dstGUID
+            srcGUID=a[4]; srcName=a[5]; dstGUID=a[8]; dstName=a[9]
+        elseif looksLikeGUID(a[3]) then
+            -- Format B: a[3]=srcGUID, a[7]=dstGUID
             srcGUID=a[3]; srcName=a[4]; dstGUID=a[7]; dstName=a[8]; spellPos=10
         else
-            -- NPC greift Spieler an: src nicht im Roster, dst im Roster
-            local sg4, dg8 = a[4] or "", a[8] or ""
-            local sg3, dg7 = a[3] or "", a[7] or ""
-            if sg4 ~= "" and roster[dg8] and not roster[sg4] then
-                srcGUID=a[4]; srcName=a[5]; dstGUID=a[8]; dstName=a[9]
-            elseif sg3 ~= "" and roster[dg7] and not roster[sg3] then
-                srcGUID=a[3]; srcName=a[4]; dstGUID=a[7]; dstName=a[8]; spellPos=10
-            else
-                return
-            end
+            return
         end
 
-        -- ① Auto-Angriff + Maul Tracking (eigener Spieler)
+        -- Nur Events verarbeiten die uns oder unsere Gruppe betreffen
+        if not isPlayer(srcGUID) and not isPlayer(dstGUID) then return end
+
+        -- ① Auto-Angriff + Maul Tracking (eigener Spieler als Angreifer)
         if srcGUID == pGUID then
             if sub == "SWING_DAMAGE" or sub == "SWING_MISSED" then
                 lastSwingTime = GetTime()
@@ -1273,8 +1278,8 @@ EF:SetScript("OnEvent", function(self, event, ...)
             end
         end
 
-        -- ② NPC greift Gruppenmitglied an → Aggro-Tracking (src nicht im Roster = NPC)
-        if not roster[srcGUID] and srcGUID and dstGUID and roster[dstGUID] then
+        -- ② NPC greift Spieler/Gruppe an → Aggro-Tracking
+        if isNPC(srcGUID) and isPlayer(dstGUID) then
             if sub=="SWING_DAMAGE" or sub=="SWING_MISSED"
             or sub=="SPELL_DAMAGE" or sub=="SPELL_MISSED"
             or sub=="RANGE_DAMAGE" or sub=="RANGE_MISSED" then

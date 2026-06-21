@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.9.2-beta] - 2026-06-21
+
+### Fix
+- **Aggro-Tracking komplett überarbeitet**: CLEU Format-Erkennung prüft jetzt ob ein Wert wie eine GUID aussieht (`string` mit `-`) statt fehleranfälliger Roster/Prefix-Checks — funktioniert zuverlässig für Format A (hideCaster) und Format B
+- `RecordAttack`: Spieler wird als Fallback direkt über `UnitGUID("player")` erkannt, falls Roster-Entry fehlt
+
+### Geändert
+- Version 4.9.2
+
 ## [4.9.1-beta] - 2026-06-21
 
 ### Fix
