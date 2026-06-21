@@ -1,5 +1,31 @@
 # Changelog
 
+## [4.7.0-beta] - 2026-06-21
+
+### Neu — Aggro Monitor (Gruppe/Raid Threat Tracker)
+- **Neues Panel**: Separater draggbarer Aggro-Monitor (`/gh aggro` zum Ein/Ausblenden)
+- **Echtzeit-Tracking**: Erkennt via Combat Log welche Gruppenmitglieder von wievielen Gegnern angegriffen werden
+- **Bis zu 8 Zeilen**: Spieler mit Aggro, sortiert nach Mob-Anzahl (meiste zuerst)
+- **Klassen-Farb-Streifen** links in WoW-Klassenfarbe
+- **Mob-Anzahl farbkodiert**: Weiss=1, Orange=2, Rot=3+
+- **Heiler-Erkennung**: 
+  - Klassen-basiert (Priester/Druide/Schamane/Paladin) als Vorgabe
+  - SPELL_HEAL-Events aus dem Combat Log markieren Spieler dynamisch als Heiler
+  - Heiler-Zeilen: rotes Hintergrund + `[H]`-Badge + rote Namensfarbe
+- **Click-to-Target**: SecureActionButtonTemplate - zielt Mob des Spielers an, auch im Kampf (kein UI-Taint)
+- **Hover-Tooltip**: Zeigt Namen der angreifenden Mobs
+- **Aggro-TTL 4s**: Mob gilt nach 4s ohne Angriff als disengaged
+- **Auto-Reset** bei Kampfende (PLAYER_REGEN_ENABLED)
+- **Roster-Tracking**: party1-4 + raid1-40, aktualisiert bei Gruppen-Aenderungen
+- Position persistent in SavedVariables (DB.tx/DB.ty)
+
+### Fix
+- CLEU Dual-Format Erkennung fuer Auto-Angriff (mit/ohne hideCaster)
+- Sound-Selector in Config: 6 Blizzard-Sounds je Kategorie mit Preview
+
+### Geaendert
+- Version 4.7.0 / TOC 2.4.0
+
 ## [4.6.0-beta] - 2026-06-21
 
 ### Neu — Modern Gaming UI Redesign

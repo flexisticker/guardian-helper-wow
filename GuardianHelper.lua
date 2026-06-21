@@ -1,8 +1,8 @@
 -- ============================================================
--- GuardianHelper v4.6 — Modern Gaming UI
+-- GuardianHelper v4.7 — Aggro Monitor
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.6.0"
+local VERSION = "4.7.0"
 
 local DB
 local LOCALE = GetLocale()
