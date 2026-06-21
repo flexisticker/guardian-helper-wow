@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.9.1-beta] - 2026-06-21
+
+### Fix
+- **TF Forward-Declaration** vor Config-Panel — „Aggro Pos. reset" Button verursachte nil-Fehler
+
+### Geändert
+- Version 4.9.1
+
 ## [4.9.0-beta] - 2026-06-21
 
 ### Fix

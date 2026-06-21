@@ -3,7 +3,7 @@
 ## Notes: Guardian Druid Tank Assistant for TBC Classic Anniversary. Rage bar, bear form indicator, Maul queue, auto-attack monitor, buff checker (MotW/Thorns), Faerie Fire & Demo Roar debuff timers, cooldown panel with click-to-cast, and a real-time aggro monitor showing which group members have aggro from how many mobs — with healer highlighting and click-to-target. Fully configurable via right-click on the minimap icon.
 ## Notes-deDE: Baeren-Druide Tank Assistent fuer TBC Classic Anniversary. Wut-Anzeige, Baerenform-Indikator, Krallenhieb-Queue, Auto-Angriff Monitor, Buff-Checker (MotW/Dornen), Feenfeuer & Entmutigungsgebruell Debuff-Timer, Cooldown-Panel mit Click-to-Cast und ein Echtzeit-Aggro-Monitor fuer Gruppen/Raids. Konfigurierbar per Rechtsklick auf das Minimap-Icon.
 ## Author: flexisticker
-## Version: 2.5.0
+## Version: 2.5.1
 ## DefaultState: Enabled
 ## X-Curse-Project-ID: 1567398
 ## X-GitHub: https://github.com/flexisticker/guardian-helper-wow

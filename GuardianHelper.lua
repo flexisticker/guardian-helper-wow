@@ -1,8 +1,8 @@
 -- ============================================================
--- GuardianHelper v4.9 — Aggro Monitor + Config
+-- GuardianHelper v4.9.1 — Aggro Monitor + Config
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.9.0"
+local VERSION = "4.9.1"
 
 local DB
 local LOCALE = GetLocale()
