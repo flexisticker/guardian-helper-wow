@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.9.7] - 2026-06-21
+
+### Fix
+- **Aggro-Monitor zeigt alle Gruppenmitglieder**: Iteration über `roster` statt `aggroData` — alle Spieler sichtbar, auch ohne aktive Aggro (zeigen `--`)
+- Sortierung: Spieler mit Aggro oben, ohne Aggro unten
+
+### Geändert
+- Version 4.9.7 / TOC 2.5.5
+
 ## [4.9.6] - 2026-06-21
 
 ### Fix

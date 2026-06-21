@@ -2,7 +2,7 @@
 -- GuardianHelper v4.9.1 — Aggro Monitor + Config
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.9.6"
+local VERSION = "4.9.7"
 
 local DB
 local LOCALE = GetLocale()
@@ -1034,20 +1034,21 @@ local function UpdateThreatUI()
         isHealer=false, isSelf=true,
     }}
 
-    -- Andere Gruppenmitglieder mit Aggro
-    for pguid, e in pairs(aggroData) do
+    -- Alle Gruppenmitglieder aus Roster (auch ohne aktive Aggro)
+    for pguid, p in pairs(roster) do
         if pguid ~= pGUID then
-            local p = roster[pguid]
-            if p and e.count > 0 then
-                local mbs = {}
+            local e = aggroData[pguid]
+            local count = e and e.count or 0
+            local mbs = {}
+            if e then
                 for _, mob in pairs(e.attackers) do table.insert(mbs, mob.name) end
-                table.insert(list, {
-                    name=p.name, class=p.class, unitId=p.unitId,
-                    count=e.count, mobs=mbs,
-                    isHealer=HEALER_CLASSES[p.class] or healerCache[pguid] or false,
-                    isSelf=false,
-                })
             end
+            table.insert(list, {
+                name=p.name, class=p.class, unitId=p.unitId,
+                count=count, mobs=mbs,
+                isHealer=HEALER_CLASSES[p.class] or healerCache[pguid] or false,
+                isSelf=false,
+            })
         end
     end
     -- Alle außer Spieler nach Mob-Anzahl sortieren (Spieler bleibt Index 1)
@@ -1102,9 +1103,14 @@ local function UpdateThreatUI()
                 end
                 local nm = d.name; if #nm>12 then nm=nm:sub(1,11)..".." end
                 row.nameL:SetText(nm)
-                local cc2 = d.count>=3 and RED or (d.count==2 and ORANGE or WHITE)
-                row.cntL:SetText(d.count.."x")
-                row.cntL:SetTextColor(cc2[1],cc2[2],cc2[3])
+                if d.count > 0 then
+                    local cc2 = d.count>=3 and RED or (d.count==2 and ORANGE or WHITE)
+                    row.cntL:SetText(d.count.."x")
+                    row.cntL:SetTextColor(cc2[1],cc2[2],cc2[3])
+                else
+                    row.cntL:SetText("--")
+                    row.cntL:SetTextColor(DIM[1],DIM[2],DIM[3])
+                end
             end
             row.mobs = d.mobs
             if not InCombatLockdown() then
