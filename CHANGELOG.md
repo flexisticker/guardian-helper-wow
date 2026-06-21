@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.9.6] - 2026-06-21
+
+### Fix
+- **Zermalmen (Maul) Name**: Richtiger DE-Name "Zermalmen" statt "KRALLENHIEB"
+- **Zermalmen Detection**: `SPELL_CAST_SUCCESS` statt `SPELL_CAST_START` — Zermalmen ist instant, `CAST_START` feuert nie
+- **Feenfeuer Detection**: Normale Faerie Fire IDs (770–9908) ergänzt; erkennt jetzt beide Varianten (regulär + Feral) unabhängig vom SpellID-Rückgabewert
+- **Aggro-Monitor Transparenz**: TF folgt jetzt `DB.alpha` (Transparenz-Regler im Config)
+
+### Geändert
+- Version 4.9.6 / TOC 2.5.4
+
 ## [4.9.5] - 2026-06-21
 
 ### Fix

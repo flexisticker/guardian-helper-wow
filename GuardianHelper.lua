@@ -2,7 +2,7 @@
 -- GuardianHelper v4.9.1 — Aggro Monitor + Config
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.9.5"
+local VERSION = "4.9.6"
 
 local DB
 local LOCALE = GetLocale()
@@ -15,8 +15,8 @@ local L = {
     BEAR_FORM      = IS_DE and "BAERENGESTALT"    or "BEAR FORM",
     DIRE_BEAR      = IS_DE and "WILDE BAER"       or "DIRE BEAR",
     NO_BEAR        = IS_DE and "KEINE BAERENFORM" or "NO BEAR FORM",
-    MAUL_READY     = IS_DE and "KRALLENHIEB"      or "MAUL QUEUED",
-    MAUL_INACTIVE  = IS_DE and "kein Maul"        or "Maul idle",
+    MAUL_READY     = IS_DE and "ZERMALMEN"         or "MAUL QUEUED",
+    MAUL_INACTIVE  = IS_DE and "kein Zermalmen"   or "Maul idle",
     CD_BASH        = IS_DE and "Hieb"    or "Bash",
     CD_GROWL       = IS_DE and "Knurr"   or "Growl",
     CD_ENRAGE      = IS_DE and "Rasen"   or "Enrage",
@@ -57,7 +57,7 @@ local SPELL_GROUPS = {
 local CD_ORDER  = { "BASH","GROWL","ENRAGE","FRENZIED_REGEN","BARKSKIN","MANGLE_BEAR","LACERATE" }
 local MAUL_IDS  = {[6807]=true,[8972]=true,[9745]=true,[9880]=true,[9881]=true,[26996]=true,[26997]=true}
 local BEAR_IDS  = {5487, 9634}
-local FF_IDS    = {16857,17390,17391,17392,27011}
+local FF_IDS    = {770,778,9749,9907,9908,16857,17390,17391,17392,27011}
 local DR_IDS    = {99,1735,9490,9747,9898,26998}
 
 local BUFF_DEFS = {
@@ -705,12 +705,14 @@ MakeBtn(" - ", 100, -190, 24, function()
     if not DB then return end
     DB.alpha = math.max(0.3, DB.alpha - 0.05)
     Frame:SetAlpha(DB.alpha)
+    TF:SetAlpha(DB.alpha)
     opVal:SetText(string.format("%d%%", DB.alpha * 100))
 end)
 MakeBtn(" + ", 128, -190, 24, function()
     if not DB then return end
     DB.alpha = math.min(1.0, DB.alpha + 0.05)
     Frame:SetAlpha(DB.alpha)
+    TF:SetAlpha(DB.alpha)
     opVal:SetText(string.format("%d%%", DB.alpha * 100))
 end)
 
@@ -1164,6 +1166,7 @@ EF:SetScript("OnEvent", function(self, event, ...)
         DB.showAggro          = DB.showAggro          == nil and true  or DB.showAggro
         DB.aggroOnlyInCombat  = DB.aggroOnlyInCombat  == nil and false or DB.aggroOnlyInCombat
         Frame:SetAlpha(DB.alpha)
+        TF:SetAlpha(DB.alpha)
         if DB.x and DB.y then
             Frame:ClearAllPoints()
             Frame:SetPoint("CENTER", UIParent, "CENTER", DB.x, DB.y)
@@ -1268,7 +1271,7 @@ EF:SetScript("OnEvent", function(self, event, ...)
         if srcGUID == pGUID then
             if sub == "SWING_DAMAGE" or sub == "SWING_MISSED" then
                 lastSwingTime = GetTime()
-            elseif sub == "SPELL_CAST_START" and MAUL_IDS[a[spellPos]] then
+            elseif sub == "SPELL_CAST_SUCCESS" and MAUL_IDS[a[spellPos]] then
                 maulQueued = true
             elseif (sub == "SPELL_DAMAGE" or sub == "SPELL_MISSED") and MAUL_IDS[a[spellPos]] then
                 maulQueued = false
@@ -1280,9 +1283,6 @@ EF:SetScript("OnEvent", function(self, event, ...)
             if sub=="SWING_DAMAGE" or sub=="SWING_MISSED"
             or sub=="SPELL_DAMAGE" or sub=="SPELL_MISSED"
             or sub=="RANGE_DAMAGE" or sub=="RANGE_MISSED" then
-                if GH_DEBUG then
-                    print("|cff00ccffGH-DBG|r RecordAttack: "..tostring(srcName).." -> "..tostring(dstName))
-                end
                 RecordAttack(srcGUID, srcName or "?", dstGUID)
             end
         end
