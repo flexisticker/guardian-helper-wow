@@ -2,7 +2,7 @@
 -- GuardianHelper v4.9.1 — Aggro Monitor + Config
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.9.9"
+local VERSION = "4.10.0"
 
 local DB
 local LOCALE = GetLocale()
@@ -478,8 +478,9 @@ footer:SetText(L.FOOTER)
 -- Frame Höhe final
 Frame:SetHeight(122 + CD_SZ + 10 + 9)
 
-local CFG  -- forward declaration (wird weiter unten definiert)
-local TF   -- forward declaration (wird weiter unten definiert)
+local CFG           -- forward declaration
+local TF            -- forward declaration
+local UpdateThreatUI -- forward declaration
 
 -- ============================================================
 -- MINIMAP BUTTON
@@ -909,15 +910,16 @@ local function CleanAggro()
 end
 
 -- ============================================================
--- AGGRO MONITOR — Frame (TF)
+-- AGGRO MONITOR — Tile Grid (TF)
 -- ============================================================
-local TW     = 178
-local TR_H   = 15
-local MAX_TR = 8
+local TILE_W    = 62
+local TILE_H    = 18
+local TILE_GAP  = 2
+local TILE_PAD  = 4
+local MAX_TILES = 41  -- 40 Raid + Spieler
 
 TF = CreateFrame("Frame", "GHThreatFrame", UIParent)
-TF:SetWidth(TW)
-TF:SetHeight(22 + MAX_TR * TR_H + 8)
+TF:SetSize(326, 60)   -- initial; wird dynamisch angepasst
 TF:SetPoint("CENTER", UIParent, "CENTER", 560, 0)
 TF:SetMovable(true); TF:EnableMouse(true); TF:RegisterForDrag("LeftButton")
 TF:SetScript("OnDragStart", function(s)
@@ -937,201 +939,218 @@ thBG:SetHeight(20); thBG:SetPoint("TOPLEFT",TF,"TOPLEFT",1,-1)
 thBG:SetPoint("TOPRIGHT",TF,"TOPRIGHT",-1,-1)
 
 local thAccent = CT(TF,"ARTWORK",ACCENT[1],ACCENT[2],ACCENT[3],1)
-thAccent:SetSize(2,20)
-thAccent:SetPoint("TOPLEFT",TF,"TOPLEFT",1,-1)
+thAccent:SetSize(2,20); thAccent:SetPoint("TOPLEFT",TF,"TOPLEFT",1,-1)
 
 local thTitle = CF(TF,9,ACCENT[1],ACCENT[2],ACCENT[3],true)
 thTitle:SetPoint("LEFT",TF,"TOPLEFT",8,-11)
-thTitle:SetText(IS_DE and "AGGRO MONITOR" or "AGGRO MONITOR")
+thTitle:SetText("AGGRO")
 
 local thInfo = CF(TF,7,DIM[1],DIM[2],DIM[3])
-thInfo:SetPoint("RIGHT",TF,"TOPRIGHT",-6,-11)
+thInfo:SetPoint("LEFT",TF,"TOPLEFT",58,-11)
 thInfo:SetText("")
+
+-- Spaltenanzahl-Label + +/- Buttons im Header
+local colLbl = CF(TF,7,DIM[1],DIM[2],DIM[3])
+colLbl:SetPoint("TOPRIGHT",TF,"TOPRIGHT",-40,-11)
+colLbl:SetText("[5]")
+
+local function MakeColBtn(lbl, xOff, delta)
+    local b = CreateFrame("Button", nil, TF)
+    b:SetSize(16,13); b:SetPoint("TOPRIGHT",TF,"TOPRIGHT",xOff,-5)
+    CT(b,"BACKGROUND",0.08,0.28,0.48,0.85):SetAllPoints()
+    local t = b:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    t:SetAllPoints(); t:SetText(lbl); t:SetTextColor(1,1,1)
+    b:SetScript("OnClick", function()
+        if not DB then return end
+        DB.aggroCols = math.max(2, math.min(8, (DB.aggroCols or 5) + delta))
+        if UpdateThreatUI then UpdateThreatUI() end
+    end)
+end
+MakeColBtn("+", -2,  1)
+MakeColBtn("-", -20, -1)
 
 Sep(TF, -21)
 
--- Zeilenspalten-Header
-local colHdr = CF(TF,6,DIM[1],DIM[2],DIM[3])
-colHdr:SetPoint("TOPLEFT",TF,"TOPLEFT",20,-20)
-colHdr:SetText(IS_DE and "Spieler" or "Player")
-local colHdr2 = CF(TF,6,DIM[1],DIM[2],DIM[3])
-colHdr2:SetPoint("TOPRIGHT",TF,"TOPRIGHT",-5,-20)
-colHdr2:SetText(IS_DE and "Mobs" or "Mobs")
+-- Tile-Array (SecureActionButtonTemplate für Click-to-Target im Kampf)
+local tiles = {}
+for i = 1, MAX_TILES do
+    local tile = CreateFrame("Button","GHTile"..i,TF,"SecureActionButtonTemplate")
+    tile:SetSize(TILE_W, TILE_H)
+    tile:SetPoint("TOPLEFT",TF,"TOPLEFT",TILE_PAD,-26)
+    tile:RegisterForClicks("AnyUp")
+    tile:SetAttribute("type","target"); tile:SetAttribute("unit","")
 
--- Dynamische Zeilen (SecureActionButtonTemplate für Click-to-Target im Kampf)
-local tRows = {}
-for i = 1, MAX_TR do
-    local y = -23 - (i-1) * TR_H
-    local row = CreateFrame("Button","GHTRow"..i,TF,"SecureActionButtonTemplate")
-    row:SetSize(TW-2, TR_H)
-    row:SetPoint("TOPLEFT",TF,"TOPLEFT",1,y)
-    row:RegisterForClicks("AnyUp")
-    row:SetAttribute("type","target")
-    row:SetAttribute("unit","")
+    local tbg = CT(tile,"BACKGROUND",BG2[1],BG2[2],BG2[3],0.85)
+    tbg:SetAllPoints(); tile.bg = tbg
 
-    -- Zeilen-BG (wird je nach Status gefärbt)
-    local rbg = CT(row,"BACKGROUND",0,0,0,0); rbg:SetAllPoints(); row.bg=rbg
+    local tclr = CT(tile,"ARTWORK",0.5,0.5,0.5,0); tclr:SetWidth(3)
+    tclr:SetPoint("TOPLEFT",tile,"TOPLEFT",0,0)
+    tclr:SetPoint("BOTTOMLEFT",tile,"BOTTOMLEFT",0,0); tile.clr = tclr
 
-    -- Klassen-Farb-Streifen (3px links)
-    local rclr = CT(row,"ARTWORK",0.5,0.5,0.5,0)
-    rclr:SetWidth(3)
-    rclr:SetPoint("TOPLEFT",row,"TOPLEFT",0,0)
-    rclr:SetPoint("BOTTOMLEFT",row,"BOTTOMLEFT",0,0)
-    row.clr = rclr
+    local tnm = CF(tile,7,WHITE[1],WHITE[2],WHITE[3])
+    tnm:SetPoint("LEFT",tile,"LEFT",5,0)
+    tnm:SetPoint("RIGHT",tile,"RIGHT",-18,0)
+    tnm:SetJustifyH("LEFT"); tnm:SetText(""); tile.nameL = tnm
 
-    -- Heiler-Badge
-    local rh = CF(row,6,RED[1],0.3,0.3)
-    rh:SetPoint("LEFT",row,"LEFT",5,0); rh:SetText(""); row.hbadge=rh
+    local tcnt = CF(tile,7,DIM[1],DIM[2],DIM[3])
+    tcnt:SetPoint("RIGHT",tile,"RIGHT",-2,0)
+    tcnt:SetJustifyH("RIGHT"); tcnt:SetText(""); tile.cntL = tcnt
 
-    -- Spieler-Name
-    local rname = CF(row,8,WHITE[1],WHITE[2],WHITE[3])
-    rname:SetPoint("LEFT",row,"LEFT",16,0); rname:SetText(""); row.nameL=rname
-
-    -- Mob-Anzahl (rechts)
-    local rcnt = CF(row,9,ORANGE[1],ORANGE[2],ORANGE[3])
-    rcnt:SetPoint("RIGHT",row,"RIGHT",-5,0); rcnt:SetText(""); row.cntL=rcnt
-
-    row:SetScript("OnEnter",function(self)
+    tile:SetScript("OnEnter",function(self)
         if self.mobs and #self.mobs > 0 then
             GameTooltip:SetOwner(self,"ANCHOR_RIGHT")
             GameTooltip:SetText(self.nameL:GetText(),1,1,1)
             for _,mn in ipairs(self.mobs) do
-                GameTooltip:AddLine("  "..mn, ORANGE[1],ORANGE[2],ORANGE[3])
+                GameTooltip:AddLine("  "..mn,ORANGE[1],ORANGE[2],ORANGE[3])
             end
-            GameTooltip:AddLine(
-                IS_DE and "\nKlick: Ziel anwählen" or "\nClick: Target their mob",
-                0.5,0.5,0.6)
+            GameTooltip:AddLine(IS_DE and "\nKlick: NPC anvisieren" or "\nClick: Target NPC",0.5,0.5,0.6)
             GameTooltip:Show()
         end
     end)
-    row:SetScript("OnLeave",function() GameTooltip:Hide() end)
-    row:Hide(); row.mobs={}
-    tRows[i]=row
+    tile:SetScript("OnLeave",function() GameTooltip:Hide() end)
+    tile:Hide(); tile.mobs = {}
+    tiles[i] = tile
 end
-
--- Leer-Hinweis
-local tEmpty = CF(TF,7,DIM[1],DIM[2],DIM[3])
-tEmpty:SetPoint("CENTER",TF,"CENTER",0,-10)
-tEmpty:SetText(IS_DE and "keine Aggro erkannt" or "no aggro detected")
 
 TF:Hide()
 
--- Update-Funktion für den Aggro-Monitor
-local function UpdateThreatUI()
+local rosterTick = 0
+UpdateThreatUI = function()
     CleanAggro()
     local pGUID = UnitGUID("player")
+    local cols  = (DB and DB.aggroCols) or 5
 
-    -- Spieler-Eintrag immer als erste Zeile
+    -- Roster alle 5s auffrischen (fängt Timing-Probleme beim Gruppenbilden auf)
+    rosterTick = rosterTick + 1
+    if rosterTick >= 10 then
+        rosterTick = 0
+        RebuildRoster()
+    end
+    -- Sofortiger Inline-Check: party1-4 die im Roster fehlen ergänzen
+    for i = 1, 4 do
+        local uid = "party"..i
+        if UnitExists(uid) then
+            local g = UnitGUID(uid)
+            if g and not roster[g] then
+                local _, cls = UnitClass(uid)
+                roster[g] = { name=UnitName(uid) or "?", class=cls or "WARRIOR", unitId=uid }
+            end
+        end
+    end
+
+    -- Liste: Spieler zuerst, dann alle Roster-Mitglieder
     local pData  = aggroData[pGUID]
     local pCount = pData and pData.count or 0
     local pMobs  = {}
     if pData then
-        for _, mob in pairs(pData.attackers) do table.insert(pMobs, mob.name) end
+        for _,mob in pairs(pData.attackers) do table.insert(pMobs, mob.name) end
     end
-    local list = {{
-        name=">> "..(UnitName("player") or "Du"),
-        class="DRUID", unitId="player",
-        count=pCount, mobs=pMobs,
-        isHealer=false, isSelf=true,
-    }}
+    local list = {{ name=(UnitName("player") or "?"), class="DRUID", unitId="player",
+                    count=pCount, mobs=pMobs, isHealer=false, isSelf=true }}
 
-    -- Alle Gruppenmitglieder aus Roster (auch ohne aktive Aggro)
     for pguid, p in pairs(roster) do
         if pguid ~= pGUID then
-            local e = aggroData[pguid]
-            local count = e and e.count or 0
+            local e   = aggroData[pguid]
+            local cnt = e and e.count or 0
             local mbs = {}
-            if e then
-                for _, mob in pairs(e.attackers) do table.insert(mbs, mob.name) end
-            end
-            table.insert(list, {
-                name=p.name, class=p.class, unitId=p.unitId,
-                count=count, mobs=mbs,
+            if e then for _,mob in pairs(e.attackers) do table.insert(mbs, mob.name) end end
+            table.insert(list, { name=p.name, class=p.class, unitId=p.unitId,
+                count=cnt, mobs=mbs,
                 isHealer=HEALER_CLASSES[p.class] or healerCache[pguid] or false,
-                isSelf=false,
-            })
+                isSelf=false })
         end
     end
-    -- Alle außer Spieler nach Mob-Anzahl sortieren (Spieler bleibt Index 1)
+
+    -- Andere nach Mob-Anzahl sortieren (Spieler bleibt Index 1)
     if #list > 2 then
         local others = {}
-        for i = 2, #list do others[#others+1] = list[i] end
+        for i=2,#list do others[#others+1]=list[i] end
         table.sort(others, function(a,b) return a.count > b.count end)
-        for i, v in ipairs(others) do list[i+1] = v end
+        for i,v in ipairs(others) do list[i+1]=v end
     end
 
     local n = #list
-    local othersWithAggro = n - 1  -- ohne Spieler
-    thInfo:SetText(othersWithAggro > 0 and othersWithAggro.." "..(IS_DE and "Spieler" or "player") or "")
-    tEmpty:SetShown(false)  -- Spieler-Zeile ist immer da
+    -- Header aktualisieren
+    local fw = cols*(TILE_W+TILE_GAP) - TILE_GAP + TILE_PAD*2
+    TF:SetWidth(fw)
+    thInfo:SetText(n.." "..(IS_DE and "Spieler" or "player"))
+    colLbl:SetText("["..cols.."]")
 
-    for i = 1, MAX_TR do
-        local row = tRows[i]
-        local d   = list[i]
+    -- Tiles befüllen + positionieren
+    for i = 1, MAX_TILES do
+        local tile = tiles[i]
+        local d    = list[i]
         if d then
-            row:Show()
+            local col = (i-1) % cols
+            local row = math.floor((i-1) / cols)
+            tile:ClearAllPoints()
+            tile:SetPoint("TOPLEFT", TF, "TOPLEFT",
+                TILE_PAD + col*(TILE_W+TILE_GAP),
+                -(26 + row*(TILE_H+TILE_GAP)))
+            tile:Show()
+
+            local cc = CLASS_COLOR[d.class] or {0.7,0.7,0.7}
+
+            -- Kachel-Farbe je nach Zustand
             if d.isSelf then
-                -- Spieler-Zeile: Teal Akzent statt Klassenfarbe
-                row.clr:SetColorTexture(ACCENT[1],ACCENT[2],ACCENT[3],1)
-                if pCount >= 1 then
-                    row.bg:SetColorTexture(0.02,0.10,0.12,0.85)
-                else
-                    row.bg:SetColorTexture(BG2[1],BG2[2],BG2[3],0.4)
-                end
-                row.hbadge:SetText("")
-                row.nameL:SetTextColor(ACCENT[1],ACCENT[2],ACCENT[3])
-                local nm = d.name; if #nm>16 then nm=nm:sub(1,15)..".." end
-                row.nameL:SetText(nm)
-                if pCount >= 1 then
-                    local cc2 = pCount>=3 and RED or (pCount==2 and ORANGE or GREEN)
-                    row.cntL:SetText(pCount.."x")
-                    row.cntL:SetTextColor(cc2[1],cc2[2],cc2[3])
-                else
-                    row.cntL:SetText("--")
-                    row.cntL:SetTextColor(DIM[1],DIM[2],DIM[3])
-                end
+                tile.clr:SetColorTexture(ACCENT[1],ACCENT[2],ACCENT[3],1)
+                tile.bg:SetColorTexture(d.count>0 and 0.02 or BG2[1],
+                                        d.count>0 and 0.12 or BG2[2],
+                                        d.count>0 and 0.14 or BG2[3],
+                                        d.count>0 and 0.9  or 0.7)
+                tile.nameL:SetTextColor(ACCENT[1],ACCENT[2],ACCENT[3])
+            elseif d.isHealer and d.count>0 then
+                tile.clr:SetColorTexture(cc[1],cc[2],cc[3],1)
+                tile.bg:SetColorTexture(0.28,0.04,0.04,0.9)
+                tile.nameL:SetTextColor(1.0,0.5,0.5)
+            elseif d.count>0 then
+                tile.clr:SetColorTexture(cc[1],cc[2],cc[3],1)
+                tile.bg:SetColorTexture(0.18,0.08,0.03,0.85)
+                tile.nameL:SetTextColor(WHITE[1],WHITE[2],WHITE[3])
             else
-                local cc = CLASS_COLOR[d.class] or {0.7,0.7,0.7}
-                row.clr:SetColorTexture(cc[1],cc[2],cc[3],1)
-                if d.isHealer then
-                    row.bg:SetColorTexture(0.25,0.03,0.03,0.75)
-                    row.hbadge:SetText("[H]")
-                    row.nameL:SetTextColor(1.0,0.45,0.45)
-                else
-                    row.bg:SetColorTexture(BG2[1],BG2[2],BG2[3],0.5)
-                    row.hbadge:SetText("")
-                    row.nameL:SetTextColor(WHITE[1],WHITE[2],WHITE[3])
-                end
-                local nm = d.name; if #nm>12 then nm=nm:sub(1,11)..".." end
-                row.nameL:SetText(nm)
-                if d.count > 0 then
-                    local cc2 = d.count>=3 and RED or (d.count==2 and ORANGE or WHITE)
-                    row.cntL:SetText(d.count.."x")
-                    row.cntL:SetTextColor(cc2[1],cc2[2],cc2[3])
-                else
-                    row.cntL:SetText("--")
-                    row.cntL:SetTextColor(DIM[1],DIM[2],DIM[3])
-                end
+                tile.clr:SetColorTexture(cc[1],cc[2],cc[3],0.45)
+                tile.bg:SetColorTexture(BG2[1],BG2[2],BG2[3],0.45)
+                tile.nameL:SetTextColor(DIM[1],DIM[2],DIM[3])
             end
-            row.mobs = d.mobs
+
+            -- Name (max 7 Zeichen für 62px)
+            local nm = d.name
+            if #nm > 7 then nm = nm:sub(1,6).."." end
+            -- Heiler-Markierung im Namen
+            if d.isHealer then nm = "+"..nm:sub(1,6) end
+            tile.nameL:SetText(nm)
+
+            -- Aggro-Count
+            if d.count > 0 then
+                local cc2 = d.count>=3 and RED or (d.count==2 and ORANGE or GREEN)
+                tile.cntL:SetText(d.count.."x")
+                tile.cntL:SetTextColor(cc2[1],cc2[2],cc2[3])
+            else
+                tile.cntL:SetText("--")
+                tile.cntL:SetTextColor(DIM[1]*0.6,DIM[2]*0.6,DIM[3]*0.6)
+            end
+
+            tile.mobs = d.mobs
+
             if not InCombatLockdown() then
-                if d.count > 0 and #d.mobs > 0 then
-                    -- Zufälligen angreifenden NPC anvisieren
+                if d.count>0 and #d.mobs>0 then
                     local mob = d.mobs[math.random(#d.mobs)]
-                    row:SetAttribute("type", "macro")
-                    row:SetAttribute("macrotext", "/target " .. mob)
+                    tile:SetAttribute("type","macro")
+                    tile:SetAttribute("macrotext","/target "..mob)
                 else
-                    row:SetAttribute("type", "target")
+                    tile:SetAttribute("type","target")
                     local uid = d.unitId
-                    row:SetAttribute("unit", uid == "player" and "target" or uid.."target")
+                    tile:SetAttribute("unit", uid=="player" and "target" or uid.."target")
                 end
             end
         else
-            row:Hide()
+            tiles[i]:Hide()
         end
     end
-    local rows = math.max(1, math.min(n, MAX_TR))
-    TF:SetHeight(22 + rows * TR_H + 8)
+
+    -- Fensterhöhe dynamisch anpassen
+    local rows = math.max(1, math.ceil(n/cols))
+    TF:SetHeight(26 + rows*(TILE_H+TILE_GAP) + TILE_PAD)
 end
 
 -- ============================================================
@@ -1180,6 +1199,7 @@ EF:SetScript("OnEvent", function(self, event, ...)
         DB.soundBuffIdx    = DB.soundBuffIdx    or 1
         DB.showAggro          = DB.showAggro          == nil and true  or DB.showAggro
         DB.aggroOnlyInCombat  = DB.aggroOnlyInCombat  == nil and false or DB.aggroOnlyInCombat
+        DB.aggroCols          = DB.aggroCols          or 5
         Frame:SetAlpha(DB.alpha)
         TF:SetAlpha(DB.alpha)
         if DB.x and DB.y then

@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.10.0] - 2026-06-21
+
+### Neu — Aggro Monitor Tile Grid (Raid-Umbau)
+- **Kachel-Layout**: Alle Raid/Gruppen-Mitglieder als kompakte Tiles (62×18px) statt Liste
+- **Spalten konfigurierbar**: `+`/`-` Buttons direkt im Header (2–8 Spalten, persistent in SavedVariables)
+- **Dynamische Fenstergröße**: Breite und Höhe passen sich automatisch an Spaltenanzahl und Spielerzahl an
+- **Farbschema**: Teal=Spieler, Orange-BG=Aggro, Rot-BG=Heiler mit Aggro, gedimmt=keine Aggro
+- **`+`-Prefix** bei Heilern im Namen
+- **Roster-Fix**: Periodisches Rebuild alle 5s + Inline-Check party1–4 — Gruppenmitglieder erscheinen auch nach Gruppen-Wechsel zuverlässig
+
+### Geändert
+- Version 4.10.0 / TOC 2.6.0
+
 ## [4.9.9] - 2026-06-21
 
 ### Neu
