@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.9.9] - 2026-06-21
+
+### Neu
+- **Aggro-Monitor: Klick auf Spieler-Zeile → NPC anvisieren**: Bei aktivem Aggro wird per Klick ein angreifender NPC anvisiert — bei mehreren Angreifern zufällige Auswahl (wechselt alle 0.5s mit dem UI-Tick)
+- Kein Aggro → Klick targetiert den Spieler selbst (bisheriges Verhalten)
+
+### Geändert
+- Version 4.9.9 / TOC 2.5.7
+
 ## [4.9.8] - 2026-06-21
 
 ### Fix

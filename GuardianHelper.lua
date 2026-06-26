@@ -2,7 +2,7 @@
 -- GuardianHelper v4.9.1 — Aggro Monitor + Config
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.9.8"
+local VERSION = "4.9.9"
 
 local DB
 local LOCALE = GetLocale()
@@ -1115,8 +1115,16 @@ local function UpdateThreatUI()
             end
             row.mobs = d.mobs
             if not InCombatLockdown() then
-                local uid = d.unitId
-                row:SetAttribute("unit", uid == "player" and "target" or uid.."target")
+                if d.count > 0 and #d.mobs > 0 then
+                    -- Zufälligen angreifenden NPC anvisieren
+                    local mob = d.mobs[math.random(#d.mobs)]
+                    row:SetAttribute("type", "macro")
+                    row:SetAttribute("macrotext", "/target " .. mob)
+                else
+                    row:SetAttribute("type", "target")
+                    local uid = d.unitId
+                    row:SetAttribute("unit", uid == "player" and "target" or uid.."target")
+                end
             end
         else
             row:Hide()
