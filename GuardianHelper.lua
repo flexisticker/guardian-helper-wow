@@ -2,7 +2,7 @@
 -- GuardianHelper v4.9.1 — Aggro Monitor + Config
 -- Guardian Druid Tank — TBC Classic 2.5.5
 -- ============================================================
-local VERSION = "4.10.0"
+local VERSION = "4.10.1"
 
 local DB
 local LOCALE = GetLocale()
@@ -1003,7 +1003,7 @@ for i = 1, MAX_TILES do
             for _,mn in ipairs(self.mobs) do
                 GameTooltip:AddLine("  "..mn,ORANGE[1],ORANGE[2],ORANGE[3])
             end
-            GameTooltip:AddLine(IS_DE and "\nKlick: NPC anvisieren" or "\nClick: Target NPC",0.5,0.5,0.6)
+            GameTooltip:AddLine(IS_DE and "\nKlick: Ziel des Spielers anvisieren" or "\nClick: Target player's target",0.5,0.5,0.6)
             GameTooltip:Show()
         end
     end)
@@ -1132,16 +1132,12 @@ UpdateThreatUI = function()
 
             tile.mobs = d.mobs
 
+            -- Ziel-Attribut: außerhalb Lockdown setzen (wird zur Klick-Zeit dynamisch ausgewertet)
+            -- partyXtarget = wen party X gerade targetiert → zeigt im Kampf auf den angreifenden NPC
             if not InCombatLockdown() then
-                if d.count>0 and #d.mobs>0 then
-                    local mob = d.mobs[math.random(#d.mobs)]
-                    tile:SetAttribute("type","macro")
-                    tile:SetAttribute("macrotext","/target "..mob)
-                else
-                    tile:SetAttribute("type","target")
-                    local uid = d.unitId
-                    tile:SetAttribute("unit", uid=="player" and "target" or uid.."target")
-                end
+                local uid = d.unitId
+                tile:SetAttribute("type","target")
+                tile:SetAttribute("unit", uid=="player" and "target" or uid.."target")
             end
         else
             tiles[i]:Hide()

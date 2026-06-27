@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.10.1] - 2026-06-21
+
+### Fix
+- **Klick auf Aggro-Kachel**: Makro-Ansatz funktioniert nicht in Combat Lockdown — umgestellt auf `partyXtarget` (WoW wertet das Ziel zur Klick-Zeit dynamisch aus, zeigt auf den NPC den der Spieler targetiert)
+
+### Geändert
+- Version 4.10.1 / TOC 2.6.1
+
 ## [4.10.0] - 2026-06-21
 
 ### Neu — Aggro Monitor Tile Grid (Raid-Umbau)
